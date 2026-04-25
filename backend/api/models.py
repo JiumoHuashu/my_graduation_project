@@ -74,3 +74,16 @@ class Rating(models.Model):
         verbose_name = '用户评分'
         verbose_name_plural = '用户评分'
         unique_together = ('user', 'book_id')
+
+
+class UserActionLog(models.Model):
+    id = models.AutoField(primary_key=True, verbose_name="行为ID")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="用户")
+    book_id = models.CharField(max_length=20, verbose_name="书籍ID")
+    action_type = models.CharField(max_length=10, choices=[('like', '收藏'), ('dislike', '不感兴趣')], verbose_name="行为类型")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="创建时间")
+
+    class Meta:
+        db_table = 'user_action_logs'
+        verbose_name = '用户行为日志'
+        verbose_name_plural = '用户行为日志'

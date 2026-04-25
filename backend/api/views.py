@@ -1,5 +1,5 @@
 from django.http import JsonResponse
-from .models import FalooBook, Admin, User, Rating, UserBookshelf
+from .models import FalooBook, Admin, User, Rating, UserBookshelf, UserActionLog
 from django.db import models
 from django.core.exceptions import ObjectDoesNotExist
 from django.views.decorators.csrf import csrf_exempt
@@ -1087,6 +1087,61 @@ def cache_clear(request):
         return JsonResponse({"code": 500, "msg": f"缓存清除失败: {str(e)}"}, status=500)
 
 
+def book_recommend_you_may_like(request):
+    """
+    猜你喜欢推荐接口
+    GET: 返回猜你喜欢的书籍列表
+    URL: /api/recommend/you_may_like/
+    """
+    try:
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # 生成缓存键
+        cache_key = "recommend:you_may_like"
+        
+        # 尝试从缓存获取数据
+        cached_data = CacheManager.get(cache_key)
+        if cached_data:
+            logger.info("猜你喜欢: 来自缓存")
+            return JsonResponse({"code": 200, "msg": "success", "data": cached_data}, safe=False)
+        
+        # 缓存失效，生成推荐结果
+        logger.info("猜你喜欢: 重新生成")
+        
+        # 这里可以根据实际情况实现推荐算法
+        # 示例：返回阅读量较高的书籍
+        books = FalooBook.objects.order_by('-read_count')[:20]
+        
+        data = []
+        for i, book in enumerate(books):
+            data.append({
+                "book_id": book.book_id,
+                "title": book.title,
+                "author": book.author,
+                "cover_url": book.cover_url,
+                "category": book.main_category,
+                "sub_category": book.sub_category,
+                "read_count": book.read_count,
+                "monthly_read": book.monthly_read,
+                "total_read": book.total_read,
+                "monthly_flowers": book.monthly_flowers,
+                "total_flowers": book.total_flowers,
+                "word_count": book.word_count,
+                "introduction": book.introduction[:60] + "..." if book.introduction else "暂无简介",
+                "update_time": book.update_time,
+                "tags": book.tags
+            })
+        
+        # 将结果存入缓存，有效期2小时（7200秒）
+        CacheManager.set(cache_key, data, 7200)
+        
+        return JsonResponse({"code": 200, "msg": "success", "data": data}, safe=False)
+        
+    except Exception as e:
+        return JsonResponse({"code": 500, "msg": f"服务器错误: {str(e)}"}, status=500)
+
+
 @csrf_exempt
 def user_profile(request, user_id):
     """
@@ -1198,3 +1253,505 @@ def user_avatar(request, user_id):
             return JsonResponse({"code": 500, "msg": f"服务器错误: {str(e)}"}, status=500)
     
     return JsonResponse({"code": 405, "msg": "请使用 POST 方法上传"}, status=405)
+
+
+@csrf_exempt
+def user_action(request):
+    """
+    用户行为反馈接口
+    POST: 记录用户的收藏和不感兴趣行为，并提供实时补偿推荐
+    URL: /api/user/action/
+    """
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            user_id = data.get('user_id')
+            book_id = data.get('book_id')
+            action_type = data.get('action_type')
+            
+            # 验证参数
+            if not user_id or not book_id or not action_type:
+                return JsonResponse({"code": 400, "msg": "用户ID、书籍ID和行为类型不能为空"}, status=400)
+            
+            # 验证行为类型
+            if action_type not in ['like', 'dislike']:
+                return JsonResponse({"code": 400, "msg": "行为类型必须是like或dislike"}, status=400)
+            
+            # 验证用户是否存在
+            try:
+                user = User.objects.get(id=user_id)
+            except User.DoesNotExist:
+                return JsonResponse({"code": 404, "msg": "用户不存在"}, status=404)
+            
+            # 验证书籍是否存在
+            try:
+                book = FalooBook.objects.get(book_id=book_id)
+            except FalooBook.DoesNotExist:
+                return JsonResponse({"code": 404, "msg": "书籍不存在"}, status=404)
+            
+            # 检查是否已经存在相同的行为记录
+            existing_action = UserActionLog.objects.filter(
+                user=user,
+                book_id=book_id,
+                action_type=action_type
+            ).first()
+            
+            if existing_action:
+                return JsonResponse({"code": 200, "msg": "行为记录已存在"})
+            
+            # 创建新的行为记录
+            UserActionLog.objects.create(
+                user=user,
+                book_id=book_id,
+                action_type=action_type
+            )
+            
+            # 实时补偿推荐
+            compensation_recommendations = []
+            
+            if action_type == 'like':
+                # 当用户收藏时，基于当前书籍的向量推荐相似书籍
+                import torch
+                import pickle
+                import os
+                
+                base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                metadata_file = os.path.join(base_dir, 'model_metadata_advanced.pkl')
+                vector_file = os.path.join(base_dir, 'book_vectors_advanced.pt')
+                
+                if os.path.exists(metadata_file) and os.path.exists(vector_file):
+                    # 加载模型和向量
+                    with open(metadata_file, 'rb') as f:
+                        metadata = pickle.load(f)
+                    df = metadata['df']
+                    book_vectors = torch.load(vector_file)
+                    
+                    # 找到当前书籍在数据框中的索引
+                    match = df[df['title'] == book.title]
+                    if not match.empty:
+                        # 获取当前书籍的向量
+                        book_idx = match.index[0]
+                        book_vector = book_vectors[book_idx].unsqueeze(0)
+                        
+                        # 计算余弦相似度
+                        sims = torch.mm(book_vector, book_vectors.t()).squeeze(0)
+                        scores, indices = torch.topk(sims, k=min(50, len(df)))
+                        
+                        # 收集用户已读/已收藏的书籍ID
+                        user_books = set()
+                        # 已收藏的书籍
+                        liked_books = UserActionLog.objects.filter(user=user, action_type='like')
+                        for liked_book in liked_books:
+                            user_books.add(liked_book.book_id)
+                        # 已加入书架的书籍
+                        bookshelf_books = UserBookshelf.objects.filter(user=user)
+                        for shelf_book in bookshelf_books:
+                            user_books.add(shelf_book.book_id)
+                        
+                        # 生成推荐结果
+                        count = 0
+                        for i in range(len(indices)):
+                            res_idx = indices[i].item()
+                            target_title = df.iloc[res_idx]['title']
+                            
+                            recommended_book = FalooBook.objects.filter(title=target_title).first()
+                            if not recommended_book:
+                                continue
+                            
+                            # 确保推荐的书籍用户未读过
+                            if recommended_book.book_id not in user_books and recommended_book.book_id != book_id:
+                                compensation_recommendations.append({
+                                    "book_id": recommended_book.book_id,
+                                    "title": recommended_book.title,
+                                    "author": recommended_book.author,
+                                    "cover_url": recommended_book.cover_url,
+                                    "category": recommended_book.main_category,
+                                    "sub_category": recommended_book.sub_category,
+                                    "read_count": recommended_book.read_count,
+                                    "monthly_read": recommended_book.monthly_read,
+                                    "total_read": recommended_book.total_read,
+                                    "monthly_flowers": recommended_book.monthly_flowers,
+                                    "total_flowers": recommended_book.total_flowers,
+                                    "word_count": recommended_book.word_count,
+                                    "introduction": recommended_book.introduction[:60] + "..." if recommended_book.introduction else "暂无简介",
+                                    "update_time": recommended_book.update_time,
+                                    "tags": recommended_book.tags,
+                                    "recommendation_reason": "基于您的收藏推荐"
+                                })
+                                count += 1
+                                if count >= 3:
+                                    break
+            elif action_type == 'dislike':
+                # 当用户不喜欢时，从缓存中剔除同类型特征的小说
+                # 这里可以实现缓存剔除逻辑
+                # 例如，使用Redis缓存，删除同类型的推荐
+                pass
+            
+            return JsonResponse({"code": 200, "msg": "行为记录成功", "compensation_recommendations": compensation_recommendations})
+            
+        except Exception as e:
+            return JsonResponse({"code": 500, "msg": f"服务器错误: {str(e)}"}, status=500)
+    else:
+        return JsonResponse({"code": 405, "msg": "只支持POST请求"}, status=405)
+
+
+@csrf_exempt
+def user_actions(request):
+    """
+    获取用户行为记录接口
+    GET: 获取用户的收藏和不感兴趣书籍
+    URL: /api/user/actions/
+    """
+    if request.method == 'GET':
+        try:
+            user_id = request.GET.get('user_id')
+            action_type = request.GET.get('action_type')  # 可选参数：like或dislike
+            
+            # 验证参数
+            if not user_id:
+                return JsonResponse({"code": 400, "msg": "用户ID不能为空"}, status=400)
+            
+            # 验证用户是否存在
+            try:
+                user = User.objects.get(id=user_id)
+            except User.DoesNotExist:
+                return JsonResponse({"code": 404, "msg": "用户不存在"}, status=404)
+            
+            # 构建查询
+            query = UserActionLog.objects.filter(user=user)
+            if action_type:
+                if action_type not in ['like', 'dislike']:
+                    return JsonResponse({"code": 400, "msg": "行为类型必须是like或dislike"}, status=400)
+                query = query.filter(action_type=action_type)
+            
+            # 执行查询并获取结果
+            actions = query.order_by('-created_at')
+            
+            # 构建响应数据
+            result = []
+            for action in actions:
+                try:
+                    book = FalooBook.objects.get(book_id=action.book_id)
+                    result.append({
+                        'id': action.id,
+                        'book_id': book.book_id,
+                        'title': book.title,
+                        'author': book.author,
+                        'cover_url': book.cover_url,
+                        'created_at': action.created_at.isoformat()
+                    })
+                except FalooBook.DoesNotExist:
+                    # 书籍不存在时跳过
+                    pass
+            
+            return JsonResponse({"code": 200, "data": result})
+            
+        except Exception as e:
+            return JsonResponse({"code": 500, "msg": f"服务器错误: {str(e)}"}, status=500)
+    else:
+        return JsonResponse({"code": 405, "msg": "只支持GET请求"}, status=405)
+
+
+@csrf_exempt
+def get_user_profile(request):
+    """
+    获取用户个人资料和阅读基因接口
+    GET: 获取用户的历史阅读倾向和阅读基因
+    URL: /api/user/profile/stats/
+    """
+    if request.method == 'GET':
+        try:
+            user_id = request.GET.get('user_id')
+            
+            # 验证参数
+            if not user_id:
+                return JsonResponse({"code": 400, "msg": "用户ID不能为空"}, status=400)
+            
+            # 验证用户是否存在
+            try:
+                user = User.objects.get(id=user_id)
+            except User.DoesNotExist:
+                return JsonResponse({"code": 404, "msg": "用户不存在"}, status=404)
+            
+            # 统计用户的历史阅读倾向
+            # 1. 收集用户的阅读记录（收藏的书籍）
+            liked_books = UserActionLog.objects.filter(user=user, action_type='like')
+            bookshelf_books = UserBookshelf.objects.filter(user=user)
+            
+            # 收集所有书籍ID
+            book_ids = set()
+            for book in liked_books:
+                book_ids.add(book.book_id)
+            for book in bookshelf_books:
+                book_ids.add(book.book_id)
+            
+            # 2. 统计各类别占比
+            category_count = {}
+            word_count_ranges = {
+                'short': 0,  # < 50万
+                'medium': 0,  # 50万-150万
+                'long': 0,  # > 150万
+            }
+            total_books = 0
+            
+            for book_id in book_ids:
+                try:
+                    book = FalooBook.objects.get(book_id=book_id)
+                    total_books += 1
+                    
+                    # 统计类别
+                    category = book.main_category
+                    if category not in category_count:
+                        category_count[category] = 0
+                    category_count[category] += 1
+                    
+                    # 统计字数区间
+                    word_count = book.word_count or 0
+                    if word_count < 500000:
+                        word_count_ranges['short'] += 1
+                    elif word_count < 1500000:
+                        word_count_ranges['medium'] += 1
+                    else:
+                        word_count_ranges['long'] += 1
+                except FalooBook.DoesNotExist:
+                    pass
+            
+            # 3. 计算各类别占比
+            category_percentage = {}
+            for category, count in category_count.items():
+                category_percentage[category] = round((count / total_books) * 100, 2) if total_books > 0 else 0
+            
+            # 4. 计算平均阅读频率（这里简化处理，使用收藏书籍的数量除以用户注册天数）
+            import datetime
+            days_since_creation = (datetime.datetime.now().date() - user.date_joined.date()).days
+            days_since_creation = max(1, days_since_creation)  # 避免除零
+            avg_reading_frequency = round(total_books / days_since_creation, 2)
+            
+            # 5. 生成阅读基因（这里使用模拟数据，实际项目中可以根据书籍内容分析）
+            reading_gene = {
+                '玄幻度': 0,
+                '情感度': 0,
+                '逻辑性': 0,
+                '热血度': 0,
+                '科技感': 0,
+                '历史感': 0,
+            }
+            
+            # 根据书籍类别设置阅读基因
+            for category, percentage in category_percentage.items():
+                if '玄幻' in category or '奇幻' in category:
+                    reading_gene['玄幻度'] += percentage * 0.8
+                if '言情' in category or '都市' in category:
+                    reading_gene['情感度'] += percentage * 0.8
+                if '推理' in category or '悬疑' in category:
+                    reading_gene['逻辑性'] += percentage * 0.8
+                if '武侠' in category or '仙侠' in category:
+                    reading_gene['热血度'] += percentage * 0.8
+                if '科幻' in category or '网游' in category:
+                    reading_gene['科技感'] += percentage * 0.8
+                if '历史' in category:
+                    reading_gene['历史感'] += percentage * 0.8
+            
+            # 归一化阅读基因，确保每个维度在0-100之间
+            for key in reading_gene:
+                reading_gene[key] = min(100, max(0, reading_gene[key]))
+            
+            # 6. 构建响应数据
+            data = {
+                'user_info': {
+                    'username': user.username,
+                    'email': user.email,
+                    'avatar': user.avatar,
+                    'joined_date': user.date_joined.isoformat(),
+                },
+                'reading_stats': {
+                    'total_books': total_books,
+                    'category_percentage': category_percentage,
+                    'word_count_ranges': word_count_ranges,
+                    'avg_reading_frequency': avg_reading_frequency,
+                },
+                'reading_gene': reading_gene,
+            }
+            
+            return JsonResponse({"code": 200, "data": data})
+            
+        except Exception as e:
+            return JsonResponse({"code": 500, "msg": f"服务器错误: {str(e)}"}, status=500)
+    else:
+        return JsonResponse({"code": 405, "msg": "只支持GET请求"}, status=405)
+
+
+@csrf_exempt
+def user_action_delete(request, action_id):
+    """
+    删除用户行为记录接口
+    DELETE: 删除用户的收藏或不感兴趣记录
+    URL: /api/user/action/<action_id>/
+    """
+    if request.method == 'DELETE':
+        try:
+            # 验证行为记录是否存在
+            try:
+                action = UserActionLog.objects.get(id=action_id)
+            except UserActionLog.DoesNotExist:
+                return JsonResponse({"code": 404, "msg": "行为记录不存在"}, status=404)
+            
+            # 删除行为记录
+            action.delete()
+            
+            return JsonResponse({"code": 200, "msg": "删除成功"})
+            
+        except Exception as e:
+            return JsonResponse({"code": 500, "msg": f"服务器错误: {str(e)}"}, status=500)
+    else:
+        return JsonResponse({"code": 405, "msg": "只支持DELETE请求"}, status=405)
+
+
+@csrf_exempt
+def post_interests(request):
+    """
+    兴趣标签提交接口
+    POST: 接收用户选择的兴趣标签，返回推荐书籍
+    URL: /api/interests/
+    """
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            tags = data.get('tags', [])
+            
+            # 验证标签数量
+            if len(tags) < 3 or len(tags) > 5:
+                return JsonResponse({"code": 400, "msg": "请选择3-5个标签"}, status=400)
+            
+            # 集成BERT模型计算标签组合的语义向量
+            import torch
+            import pickle
+            import os
+            
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            metadata_file = os.path.join(base_dir, 'model_metadata_advanced.pkl')
+            vector_file = os.path.join(base_dir, 'book_vectors_advanced.pt')
+            
+            if not os.path.exists(metadata_file) or not os.path.exists(vector_file):
+                # 如果模型文件不存在，返回基于阅读量的推荐
+                books = FalooBook.objects.order_by('-read_count')[:10]
+                
+                data = []
+                for i, book in enumerate(books):
+                    data.append({
+                        "book_id": book.book_id,
+                        "title": book.title,
+                        "author": book.author,
+                        "cover_url": book.cover_url,
+                        "category": book.main_category,
+                        "sub_category": book.sub_category,
+                        "read_count": book.read_count,
+                        "monthly_read": book.monthly_read,
+                        "total_read": book.total_read,
+                        "monthly_flowers": book.monthly_flowers,
+                        "total_flowers": book.total_flowers,
+                        "word_count": book.word_count,
+                        "introduction": book.introduction[:60] + "..." if book.introduction else "暂无简介",
+                        "update_time": book.update_time,
+                        "tags": book.tags
+                    })
+            else:
+                # 加载模型和向量
+                with open(metadata_file, 'rb') as f:
+                    metadata = pickle.load(f)
+                df = metadata['df']
+                encoders = metadata['encoders']
+                book_vectors = torch.load(vector_file)
+                
+                # 计算标签组合的语义向量
+                # 这里使用一个简单的方法：找到包含这些标签的书籍，取它们的向量平均值
+                # 实际项目中可以使用BERT模型对标签进行编码
+                
+                # 收集包含任何一个标签的书籍标题
+                matching_titles = []
+                for tag in tags:
+                    # 查找标题中包含标签的书籍
+                    tag_books = FalooBook.objects.filter(title__icontains=tag)[:10]
+                    matching_titles.extend([book.title for book in tag_books])
+                
+                # 去重
+                matching_titles = list(set(matching_titles))
+                
+                # 计算标签向量
+                tag_vectors = []
+                for title in matching_titles:
+                    match = df[df['title'].str.contains(title, na=False)]
+                    if not match.empty:
+                        idx = match.index[0]
+                        tag_vectors.append(book_vectors[idx])
+                
+                if tag_vectors:
+                    # 计算标签向量的平均值
+                    tag_vector = torch.stack(tag_vectors).mean(dim=0).unsqueeze(0)
+                    
+                    # 计算余弦相似度
+                    sims = torch.mm(tag_vector, book_vectors.t()).squeeze(0)
+                    scores, indices = torch.topk(sims, k=min(25, len(df)))
+                    
+                    # 生成推荐结果
+                    data = []
+                    count = 0
+                    for i in range(len(indices)):
+                        res_idx = indices[i].item()
+                        target_title = df.iloc[res_idx]['title']
+                        
+                        book = FalooBook.objects.filter(title=target_title).first()
+                        if not book:
+                            continue
+                        
+                        count += 1
+                        data.append({
+                            "book_id": book.book_id,
+                            "title": book.title,
+                            "author": book.author,
+                            "cover_url": book.cover_url,
+                            "category": book.main_category,
+                            "sub_category": book.sub_category,
+                            "read_count": book.read_count,
+                            "monthly_read": book.monthly_read,
+                            "total_read": book.total_read,
+                            "monthly_flowers": book.monthly_flowers,
+                            "total_flowers": book.total_flowers,
+                            "word_count": book.word_count,
+                            "introduction": book.introduction[:60] + "..." if book.introduction else "暂无简介",
+                            "update_time": book.update_time,
+                            "tags": book.tags
+                        })
+                        
+                        if count >= 10:
+                            break
+                else:
+                    # 如果没有找到匹配的标签，返回基于阅读量的推荐
+                    books = FalooBook.objects.order_by('-read_count')[:10]
+                    
+                    data = []
+                    for i, book in enumerate(books):
+                        data.append({
+                            "book_id": book.book_id,
+                            "title": book.title,
+                            "author": book.author,
+                            "cover_url": book.cover_url,
+                            "category": book.main_category,
+                            "sub_category": book.sub_category,
+                            "read_count": book.read_count,
+                            "monthly_read": book.monthly_read,
+                            "total_read": book.total_read,
+                            "monthly_flowers": book.monthly_flowers,
+                            "total_flowers": book.total_flowers,
+                            "word_count": book.word_count,
+                            "introduction": book.introduction[:60] + "..." if book.introduction else "暂无简介",
+                            "update_time": book.update_time,
+                            "tags": book.tags
+                        })
+            
+            return JsonResponse({"code": 200, "msg": "success", "data": data}, safe=False)
+            
+        except Exception as e:
+            return JsonResponse({"code": 500, "msg": f"服务器错误: {str(e)}"}, status=500)
+    else:
+        return JsonResponse({"code": 405, "msg": "只支持POST请求"}, status=405)

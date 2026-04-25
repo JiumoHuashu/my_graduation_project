@@ -25,7 +25,22 @@
           >
             基于分类推荐
           </button>
+          <button
+            class="mode-btn"
+            :class="{ active: selectedMode === 'interest' }"
+            @click="selectMode('interest')"
+          >
+            兴趣雷达
+          </button>
         </div>
+      </div>
+
+      <div v-if="selectedMode === 'interest'" class="interest-section">
+        <h3>兴趣雷达</h3>
+        <p class="interest-hint">点击下方按钮开始兴趣雷达测试</p>
+        <button class="recommend-btn" @click="showInterestRadar">
+          开始兴趣测试
+        </button>
       </div>
 
       <div v-if="selectedMode === 'book'" class="book-input-section">
@@ -64,7 +79,7 @@
       </div>
 
       <div v-if="recommendations.length > 0" class="recommendations-section">
-        <h3>{{ selectedMode === 'book' ? '相似推荐结果' : '优质推荐结果' }}</h3>
+        <h3>{{ selectedMode === 'book' ? '相似推荐结果' : recommendations[0].recommendation_reason ? '基于您的收藏推荐' : '优质推荐结果' }}</h3>
         <div class="books-grid">
           <div
             v-for="(book, index) in recommendations.slice(0, 10)"
@@ -86,6 +101,14 @@
               <div class="book-intro">
                 {{ book.intro }}
               </div>
+              <div class="book-actions">
+                <button class="action-btn small like-btn" :class="{ 'liked': likedBooks[book.book_id] }" @click="handleUserAction(book.book_id, 'like')">
+                  <span class="action-icon">❤️</span>
+                </button>
+                <button class="action-btn small dislike-btn" @click="handleUserAction(book.book_id, 'dislike')">
+                  <span class="action-icon">✕</span>
+                </button>
+              </div>
               <div class="book-full-intro">
                 <h4 class="book-title" @click="goToDetail(book.book_id)">{{ book.title }}</h4>
                 <div class="book-full-intro-text">
@@ -100,6 +123,12 @@
       <div v-if="loading" class="loading">加载推荐中...</div>
       <div v-if="error" class="error">{{ error }}</div>
     </div>
+
+    <!-- 兴趣雷达模态框 -->
+    <InterestRadar 
+      :visible="interestRadarVisible" 
+      @confirm="handleInterestConfirm"
+    />
   </div>
 </template>
 
@@ -107,17 +136,20 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
+import InterestRadar from './InterestRadar.vue'
 
 const router = useRouter()
 
 const mainCategories = ['同人小说', '玄幻奇幻', '武侠仙侠', '都市言情', '军事历史', '科幻网游', '推理灵异', '青春校园', '轻小说', '女生小说']
 
-const selectedMode = ref('category')
+const selectedMode = ref('interest')
 const bookName = ref('')
 const selectedCategories = ref([])
 const recommendations = ref([])
 const loading = ref(false)
 const error = ref('')
+const interestRadarVisible = ref(false)
+const likedBooks = ref({})
 
 const selectMode = (mode) => {
   selectedMode.value = mode
@@ -125,6 +157,39 @@ const selectMode = (mode) => {
   bookName.value = ''
   recommendations.value = []
   error.value = ''
+  interestRadarVisible.value = false
+  
+  // 当选择兴趣雷达模式时，重新加载推荐列表，包括补偿推荐
+  if (mode === 'interest') {
+    loadInitialRecommendations()
+  }
+}
+
+const showInterestRadar = () => {
+  interestRadarVisible.value = true
+}
+
+const handleInterestConfirm = async (tags) => {
+  interestRadarVisible.value = false
+  loading.value = true
+  error.value = ''
+  
+  try {
+    const res = await axios.post('http://127.0.0.1:8000/api/interests/', {
+      tags: tags
+    })
+    
+    if (res.data.code === 200) {
+      recommendations.value = res.data.data
+    } else {
+      error.value = res.data.msg
+    }
+  } catch (err) {
+    console.error('获取兴趣推荐失败:', err)
+    error.value = '获取推荐失败，请检查网络连接'
+  } finally {
+    loading.value = false
+  }
 }
 
 const toggleCategory = (cat) => {
@@ -187,7 +252,83 @@ const goToDetail = (bookId) => {
   router.push(`/${bookId}`)
 }
 
+const handleUserAction = async (bookId, actionType) => {
+  try {
+    const savedUser = localStorage.getItem('user')
+    if (!savedUser) {
+      alert('请先登录')
+      return
+    }
+
+    const user = JSON.parse(savedUser)
+    const res = await axios.post('http://127.0.0.1:8000/api/user/action/', {
+      user_id: user.id,
+      book_id: bookId,
+      action_type: actionType
+    })
+
+    if (res.data.code === 200) {
+      // 对于收藏行为，更新likedBooks状态
+      if (actionType === 'like') {
+        likedBooks.value[bookId] = !likedBooks.value[bookId]
+        
+        // 处理补偿推荐
+        if (res.data.compensation_recommendations && res.data.compensation_recommendations.length > 0) {
+          // 将补偿推荐的书籍添加到本地存储，供首页使用
+          localStorage.setItem('compensation_recommendations', JSON.stringify(res.data.compensation_recommendations))
+          // 重新加载推荐列表，显示补偿推荐
+          await loadInitialRecommendations()
+          // 提示用户有新的推荐
+          alert('我们为您推荐了一些相似的书籍，请到首页查看！')
+        }
+      }
+    } else {
+      console.error('提交行为反馈失败:', res.data.msg)
+    }
+  } catch (error) {
+    console.error('提交行为反馈失败:', error)
+  }
+}
+
+const loadInitialRecommendations = async () => {
+  try {
+    loading.value = true
+    error.value = ''
+    
+    // 首先检查本地存储中是否有补偿推荐的书籍
+    const compensationRecs = localStorage.getItem('compensation_recommendations')
+    
+    // 然后获取常规推荐
+    const res = await axios.get('http://127.0.0.1:8000/api/recommend/you_may_like/')
+    
+    if (res.data.code === 200) {
+      if (compensationRecs) {
+        try {
+          const parsedRecs = JSON.parse(compensationRecs)
+          // 将补偿推荐的书籍添加到推荐列表的最前端
+          recommendations.value = [...parsedRecs, ...res.data.data]
+          // 清除本地存储中的补偿推荐，避免重复显示
+          localStorage.removeItem('compensation_recommendations')
+        } catch (e) {
+          console.error('解析补偿推荐失败:', e)
+          recommendations.value = res.data.data
+        }
+      } else {
+        recommendations.value = res.data.data
+      }
+    } else {
+      error.value = res.data.msg
+    }
+  } catch (err) {
+    console.error('获取推荐失败:', err)
+    error.value = '获取推荐失败，请检查网络连接'
+  } finally {
+    loading.value = false
+  }
+}
+
 onMounted(() => {
+  loadInitialRecommendations()
 })
 </script>
 
@@ -625,6 +766,76 @@ onMounted(() => {
   font-weight: 320;
 }
 
+.book-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.action-btn {
+  padding: 6px 12px;
+  border: 1px solid #000000;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.action-btn.small {
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+.like-btn {
+  background: #ffffff;
+  color: #000000;
+  border-color: #ff6b6b;
+  transition: all 0.3s ease;
+}
+
+.like-btn:hover {
+  background: rgba(255, 107, 107, 0.1);
+  transform: scale(1.1);
+}
+
+.like-btn.liked {
+  background: #ff6b6b;
+  color: #ffffff;
+  border-color: #ff6b6b;
+  animation: pulse 0.5s ease;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.dislike-btn {
+  background: #ffffff;
+  color: #000000;
+  border-color: #666666;
+  transition: all 0.3s ease;
+}
+
+.dislike-btn:hover {
+  background: rgba(102, 102, 102, 0.1);
+  transform: scale(1.1);
+}
+
+.action-icon {
+  font-size: 12px;
+}
+
 .loading {
   text-align: center;
   padding: 48px 0;
@@ -641,6 +852,24 @@ onMounted(() => {
   border-radius: 8px;
   margin-top: 24px;
   font-weight: 400;
+}
+
+.interest-section {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  text-align: center;
+}
+
+.interest-hint {
+  margin: 16px 0 24px 0;
+  color: #666666;
+  font-size: 14px;
+  font-weight: 320;
+  letter-spacing: -0.1px;
 }
 
 @media (max-width: 1200px) {

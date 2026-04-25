@@ -1,5 +1,5 @@
 from django.urls import path
-from api.views import book_rank_api, book_detail_api, admin_login, admin_books, admin_book_detail, user_register, user_login, user_bookshelf, user_bookshelf_remove, book_search, book_recommend, book_recommend_by_book, book_recommend_by_category, book_recommend_by_bookshelf, hot_books, admin_users, admin_user_detail, user_rating, user_rating_detail, book_rating, cache_warmup, cache_clear, user_profile, user_password, user_avatar
+from api.views import book_rank_api, book_detail_api, admin_login, admin_books, admin_book_detail, user_register, user_login, user_bookshelf, user_bookshelf_remove, book_search, book_recommend, book_recommend_by_book, book_recommend_by_category, book_recommend_by_bookshelf, hot_books, admin_users, admin_user_detail, user_rating, user_rating_detail, book_rating, cache_warmup, cache_clear, book_recommend_you_may_like, post_interests, user_action, user_action_delete, user_actions, get_user_profile, user_profile, user_password, user_avatar
 
 urlpatterns = [
     # 排行榜接口
@@ -16,6 +16,18 @@ urlpatterns = [
     path('recommend/category/', book_recommend_by_category),
     # 基于书架的推荐接口
     path('recommend/bookshelf/', book_recommend_by_bookshelf),
+    # 猜你喜欢接口
+    path('recommend/you_may_like/', book_recommend_you_may_like),
+    # 兴趣标签提交接口
+    path('interests/', post_interests),
+    # 用户行为反馈接口
+    path('user/action/', user_action),
+    # 删除用户行为记录接口
+    path('user/action/<int:action_id>/', user_action_delete),
+    # 获取用户行为记录接口
+    path('user/actions/', user_actions),
+    # 获取用户个人资料和阅读基因接口
+    path('user/profile/stats/', get_user_profile),
     # 热门书籍接口
     path('hot/', hot_books),
     # 管理员相关路由

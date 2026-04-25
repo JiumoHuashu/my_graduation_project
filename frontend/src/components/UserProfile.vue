@@ -108,7 +108,54 @@
       </div>
 
       <div class="profile-section">
+        <h3 class="section-title">感兴趣的书籍</h3>
+        <div v-if="loadingInterests" class="loading-ratings">加载中...</div>
+        <div v-else-if="likedBooks.length === 0" class="no-ratings">暂无感兴趣的书籍</div>
+        <div v-else class="ratings-list">
+          <div v-for="book in likedBooks" :key="book.id" class="rating-item">
+            <div class="rating-book-info">
+              <img :src="book.cover_url" :alt="book.title" class="rating-book-cover">
+              <div class="rating-book-details">
+                <h4 class="rating-book-title" @click="goToBookDetail(book.book_id)">{{ book.title }}</h4>
+                <p class="rating-book-author">{{ book.author }}</p>
+                <div class="rating-time">
+                  <span>添加时间: {{ formatDate(book.created_at) }}</span>
+                </div>
+              </div>
+            </div>
+            <div class="rating-actions">
+              <button class="delete-rating-btn" @click="deleteUserAction(book.id)">删除</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="profile-section">
+        <h3 class="section-title">不感兴趣的书籍</h3>
+        <div v-if="loadingDisinterests" class="loading-ratings">加载中...</div>
+        <div v-else-if="dislikedBooks.length === 0" class="no-ratings">暂无不感兴趣的书籍</div>
+        <div v-else class="ratings-list">
+          <div v-for="book in dislikedBooks" :key="book.id" class="rating-item">
+            <div class="rating-book-info">
+              <img :src="book.cover_url" :alt="book.title" class="rating-book-cover">
+              <div class="rating-book-details">
+                <h4 class="rating-book-title" @click="goToBookDetail(book.book_id)">{{ book.title }}</h4>
+                <p class="rating-book-author">{{ book.author }}</p>
+                <div class="rating-time">
+                  <span>添加时间: {{ formatDate(book.created_at) }}</span>
+                </div>
+              </div>
+            </div>
+            <div class="rating-actions">
+              <button class="delete-rating-btn" @click="deleteUserAction(book.id)">删除</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="profile-section">
         <h3 class="section-title">操作</h3>
+        <button class="logout-btn" @click="goToReadingProfile">查看阅读基因画像</button>
         <button class="logout-btn" @click="logout">退出登录</button>
       </div>
     </div>
@@ -197,6 +244,11 @@ const loadingRatings = ref(false)
 const editingRating = ref(null)
 const editRatingScore = ref(0)
 const ratingError = ref('')
+
+const likedBooks = ref([])
+const dislikedBooks = ref([])
+const loadingInterests = ref(false)
+const loadingDisinterests = ref(false)
 
 const goBack = () => {
   router.back()
@@ -352,6 +404,48 @@ const fetchUserRatings = async () => {
   }
 }
 
+const fetchUserInterests = async () => {
+  try {
+    const savedUser = localStorage.getItem('user')
+    if (!savedUser) return
+
+    loadingInterests.value = true
+    const userData = JSON.parse(savedUser)
+    const res = await axios.get('http://127.0.0.1:8000/api/user/actions/', {
+      params: { user_id: userData.id, action_type: 'like' }
+    })
+
+    if (res.data.code === 200) {
+      likedBooks.value = res.data.data
+    }
+  } catch (error) {
+    console.error('获取感兴趣书籍失败:', error)
+  } finally {
+    loadingInterests.value = false
+  }
+}
+
+const fetchUserDisinterests = async () => {
+  try {
+    const savedUser = localStorage.getItem('user')
+    if (!savedUser) return
+
+    loadingDisinterests.value = true
+    const userData = JSON.parse(savedUser)
+    const res = await axios.get('http://127.0.0.1:8000/api/user/actions/', {
+      params: { user_id: userData.id, action_type: 'dislike' }
+    })
+
+    if (res.data.code === 200) {
+      dislikedBooks.value = res.data.data
+    }
+  } catch (error) {
+    console.error('获取不感兴趣书籍失败:', error)
+  } finally {
+    loadingDisinterests.value = false
+  }
+}
+
 const startEditRating = (rating) => {
   editingRating.value = rating
   editRatingScore.value = rating.score
@@ -410,8 +504,31 @@ const deleteRating = async (ratingId) => {
   }
 }
 
+const deleteUserAction = async (actionId) => {
+  if (!confirm('确定要删除这个记录吗？')) return
+
+  try {
+    const res = await axios.delete(`http://127.0.0.1:8000/api/user/action/${actionId}/`)
+
+    if (res.data.code === 200) {
+      // 重新加载用户行为记录
+      await fetchUserInterests()
+      await fetchUserDisinterests()
+    } else {
+      alert(res.data.msg)
+    }
+  } catch (error) {
+    console.error('删除行为记录失败:', error)
+    alert('删除行为记录失败，请检查网络连接')
+  }
+}
+
 const goToBookDetail = (bookId) => {
   router.push(`/book/${bookId}`)
+}
+
+const goToReadingProfile = () => {
+  router.push('/reading-profile')
 }
 
 const formatDate = (dateString) => {
@@ -439,6 +556,8 @@ onMounted(() => {
   editForm.email = user.value.email
 
   fetchUserRatings()
+  fetchUserInterests()
+  fetchUserDisinterests()
 })
 </script>
 

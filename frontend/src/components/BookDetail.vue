@@ -90,9 +90,17 @@
             <button :class="['add-to-bookshelf-btn', { 'in-bookshelf': isInBookshelf }]" @click="addToBookshelf">
               {{ isInBookshelf ? '已在书架' : '加入书架' }}
             </button>
-            <button class="original-btn" @click="visitOriginalPage">
-              访问原网页
+            <button class="action-btn like-btn" :class="{ 'liked': isLiked }" @click="handleUserAction('like')">
+              <span class="action-icon">❤️</span>
             </button>
+            <div class="original-page-container">
+              <button class="original-btn" @click="visitOriginalPage">
+                访问原网页
+              </button>
+              <button class="action-btn dislike-btn small" @click="handleUserAction('dislike')">
+                <span class="action-icon">✕</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -198,6 +206,7 @@ const loading = ref(false)
 const error = ref('')
 const maxValue = ref(10000000)
 const isInBookshelf = ref(false)
+const isLiked = ref(false)
 const bookRating = ref(0)
 const userRating = ref(0)
 const ratingCount = ref(0)
@@ -220,6 +229,7 @@ const fetchBookDetail = async () => {
         1000000
       )
       await checkIfInBookshelf()
+      await checkIfLiked()
       await fetchBookRating()
       await fetchUserRating()
     } else {
@@ -296,6 +306,29 @@ const checkIfInBookshelf = async () => {
   } catch (error) {
     console.error('检查书架失败:', error)
     isInBookshelf.value = false
+  }
+}
+
+const checkIfLiked = async () => {
+  if (!book.value) {
+    isLiked.value = false
+    return
+  }
+
+  try {
+    const savedUser = localStorage.getItem('user')
+    if (!savedUser) {
+      isLiked.value = false
+      return
+    }
+
+    const user = JSON.parse(savedUser)
+    // 这里可以添加一个API来检查用户是否收藏了该书籍
+    // 暂时默认未收藏
+    isLiked.value = false
+  } catch (error) {
+    console.error('检查收藏状态失败:', error)
+    isLiked.value = false
   }
 }
 
@@ -419,6 +452,44 @@ const submitRating = async () => {
     ratingError.value = '提交评分失败，请检查网络连接'
   } finally {
     isRating.value = false
+  }
+}
+
+const handleUserAction = async (actionType) => {
+  if (!book.value) return
+
+  try {
+    const savedUser = localStorage.getItem('user')
+    if (!savedUser) {
+      alert('请先登录')
+      return
+    }
+
+    const user = JSON.parse(savedUser)
+    const res = await axios.post('http://127.0.0.1:8000/api/user/action/', {
+      user_id: user.id,
+      book_id: book.value.book_id,
+      action_type: actionType
+    })
+
+    if (res.data.code === 200) {
+      // 对于收藏行为，更新isLiked状态
+      if (actionType === 'like') {
+        isLiked.value = !isLiked.value
+        
+        // 处理补偿推荐
+        if (res.data.compensation_recommendations && res.data.compensation_recommendations.length > 0) {
+          // 将补偿推荐的书籍添加到本地存储，供首页使用
+          localStorage.setItem('compensation_recommendations', JSON.stringify(res.data.compensation_recommendations))
+          // 提示用户有新的推荐
+          alert('我们为您推荐了一些相似的书籍，请到首页查看！')
+        }
+      }
+    } else {
+      console.error('提交行为反馈失败:', res.data.msg)
+    }
+  } catch (error) {
+    console.error('提交行为反馈失败:', error)
   }
 }
 
@@ -718,9 +789,9 @@ watch(() => props.bookId, (newId) => {
   flex-wrap: wrap;
 }
 
-.add-to-bookshelf-btn, .read-btn, .original-btn {
+.add-to-bookshelf-btn, .action-btn, .original-btn {
   flex: 1;
-  min-width: 140px;
+  min-width: 120px;
   padding: 14px 24px;
   border: none;
   border-radius: 50px;
@@ -729,6 +800,99 @@ watch(() => props.bookId, (newId) => {
   letter-spacing: -0.14px;
   cursor: pointer;
   transition: opacity 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.action-btn {
+  border: 1px solid #000000;
+}
+
+.like-btn {
+  background: #ffffff;
+  color: #000000;
+  border-color: #ff6b6b;
+  transition: all 0.3s ease;
+}
+
+.like-btn:hover {
+  background: rgba(255, 107, 107, 0.1);
+  transform: scale(1.1);
+}
+
+.like-btn.liked {
+  background: #ff6b6b;
+  color: #ffffff;
+  border-color: #ff6b6b;
+  animation: pulse 0.5s ease;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.dislike-btn {
+  background: #ffffff;
+  color: #000000;
+  border-color: #666666;
+  transition: all 0.3s ease;
+}
+
+.dislike-btn:hover {
+  background: rgba(102, 102, 102, 0.1);
+  transform: scale(1.1);
+}
+
+.dislike-btn.small {
+  font-size: 12px;
+  padding: 6px 12px;
+  min-width: auto;
+  flex: none;
+}
+
+.action-icon {
+  font-size: 14px;
+}
+
+.original-page-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+.original-btn {
+  flex: 1;
+  min-width: 140px;
+  padding: 14px 24px;
+  background: #ffffff;
+  color: #000000;
+  border: 1px solid #000000;
+  border-radius: 50px;
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: -0.14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.original-btn:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.original-btn:focus {
+  outline: dashed 2px #000000;
+  outline-offset: 2px;
 }
 
 .add-to-bookshelf-btn {

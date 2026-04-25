@@ -5,6 +5,7 @@ import RankPage from '../components/RankPage.vue'
 import HotBooksPage from '../components/HotBooksPage.vue'
 import BookDetail from '../components/BookDetail.vue'
 import UserProfile from '../components/UserProfile.vue'
+import UserReadingProfile from '../components/UserReadingProfile.vue'
 import Bookshelf from '../components/Bookshelf.vue'
 import AdminLogin from '../components/AdminLogin.vue'
 import AdminPanel from '../components/AdminPanel.vue'
@@ -45,6 +46,11 @@ const routes = [
     path: '/profile',
     name: 'profile',
     component: UserProfile
+  },
+  {
+    path: '/reading-profile',
+    name: 'readingProfile',
+    component: UserReadingProfile
   },
   {
     path: '/bookshelf',
