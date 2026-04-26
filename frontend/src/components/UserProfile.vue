@@ -6,158 +6,192 @@
     </header>
 
     <div class="profile-container">
-      <div class="profile-card">
-        <div class="profile-avatar">
-          <img :src="user.avatar" alt="用户头像">
-          <input
-            type="file"
-            id="avatar-upload"
-            class="avatar-upload-input"
-            accept="image/*"
-            @change="handleAvatarUpload"
-          >
-          <label for="avatar-upload" class="avatar-upload-btn">更换头像</label>
-        </div>
-        <h2 class="profile-username">{{ user.username }}</h2>
-        <p class="profile-email">{{ user.email }}</p>
-      </div>
-
-      <div class="profile-section">
-        <h3 class="section-title">个人信息</h3>
-        <div class="info-form">
-          <div class="form-group">
-            <label for="username">用户名</label>
+      <!-- 左侧侧边栏 -->
+      <aside class="profile-sidebar">
+        <div class="profile-card">
+          <div class="profile-avatar">
+            <img :src="user.avatar" alt="用户头像">
             <input
-              type="text"
-              id="username"
-              v-model="editForm.username"
-              :disabled="!isEditing"
+              type="file"
+              id="avatar-upload"
+              class="avatar-upload-input"
+              accept="image/*"
+              @change="handleAvatarUpload"
             >
+            <label for="avatar-upload" class="avatar-upload-btn">更换头像</label>
           </div>
-          <div class="form-group">
-            <label for="email">邮箱</label>
-            <input
-              type="email"
-              id="email"
-              v-model="editForm.email"
-              :disabled="!isEditing"
-            >
-          </div>
-          <div class="form-actions">
-            <button
-              v-if="!isEditing"
-              class="edit-btn"
-              @click="isEditing = true"
-            >
-              编辑信息
-            </button>
-            <div v-else class="action-buttons">
-              <button class="save-btn" @click="saveChanges">保存</button>
-              <button class="cancel-btn" @click="cancelEdit">取消</button>
-            </div>
+          <h2 class="profile-username">{{ user.username }}</h2>
+          <p class="profile-email">{{ user.email }}</p>
+          
+          <div class="sidebar-actions">
+            <button class="sidebar-btn" @click="goToReadingProfile">查看阅读基因画像</button>
+            <button class="sidebar-btn logout-btn" @click="logout">退出登录</button>
           </div>
         </div>
-      </div>
+      </aside>
 
-      <div class="profile-section">
-        <h3 class="section-title">账号安全</h3>
-        <div class="security-item">
-          <span>修改密码</span>
-          <button class="link-btn" @click="showChangePassword = true">修改</button>
-        </div>
-      </div>
-
-      <div class="profile-section">
-        <h3 class="section-title">我的评分</h3>
-        <div v-if="loadingRatings" class="loading-ratings">加载评分中...</div>
-        <div v-else-if="ratings.length === 0" class="no-ratings">暂无评分记录</div>
-        <div v-else class="ratings-list">
-          <div v-for="rating in ratings" :key="rating.id" class="rating-item">
-            <div class="rating-book-info">
-              <img :src="rating.book.cover_url" :alt="rating.book.title" class="rating-book-cover">
-              <div class="rating-book-details">
-                <h4 class="rating-book-title" @click="goToBookDetail(rating.book.book_id)">{{ rating.book.title }}</h4>
-                <p class="rating-book-author">{{ rating.book.author }}</p>
-                <div class="rating-time">
-                  <span>评分时间: {{ formatDate(rating.created_at) }}</span>
-                  <span v-if="rating.updated_at !== rating.created_at"> (更新于: {{ formatDate(rating.updated_at) }})</span>
-                </div>
-              </div>
+      <!-- 右侧内容区 -->
+      <main class="profile-content">
+        <div class="profile-section">
+          <h3 class="section-title">个人信息</h3>
+          <div class="info-form">
+            <div class="form-group">
+              <label for="username">用户名</label>
+              <input
+                type="text"
+                id="username"
+                v-model="editForm.username"
+                :disabled="!isEditing"
+              >
             </div>
-            <div class="rating-actions">
-              <div v-if="editingRating && editingRating.id === rating.id" class="rating-edit">
-                <StarRating
-                  v-model:rating="editRatingScore"
-                />
-                <div class="rating-edit-buttons">
-                  <button class="save-rating-btn" @click="saveRating">保存</button>
-                  <button class="cancel-rating-btn" @click="cancelEditRating">取消</button>
-                </div>
-                <div v-if="ratingError" class="rating-error">{{ ratingError }}</div>
-              </div>
-              <div v-else class="rating-display">
-                <div class="rating-score">{{ rating.score }}分</div>
-                <div class="rating-buttons">
-                  <button class="edit-rating-btn" @click="startEditRating(rating)">编辑</button>
-                  <button class="delete-rating-btn" @click="deleteRating(rating.id)">删除</button>
-                </div>
+            <div class="form-group">
+              <label for="email">邮箱</label>
+              <input
+                type="email"
+                id="email"
+                v-model="editForm.email"
+                :disabled="!isEditing"
+              >
+            </div>
+            <div class="form-actions">
+              <button
+                v-if="!isEditing"
+                class="edit-btn"
+                @click="isEditing = true"
+              >
+                编辑信息
+              </button>
+              <div v-else class="action-buttons">
+                <button class="save-btn" @click="saveChanges">保存</button>
+                <button class="cancel-btn" @click="cancelEdit">取消</button>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="profile-section">
-        <h3 class="section-title">感兴趣的书籍</h3>
-        <div v-if="loadingInterests" class="loading-ratings">加载中...</div>
-        <div v-else-if="likedBooks.length === 0" class="no-ratings">暂无感兴趣的书籍</div>
-        <div v-else class="ratings-list">
-          <div v-for="book in likedBooks" :key="book.id" class="rating-item">
-            <div class="rating-book-info">
-              <img :src="book.cover_url" :alt="book.title" class="rating-book-cover">
-              <div class="rating-book-details">
-                <h4 class="rating-book-title" @click="goToBookDetail(book.book_id)">{{ book.title }}</h4>
-                <p class="rating-book-author">{{ book.author }}</p>
-                <div class="rating-time">
-                  <span>添加时间: {{ formatDate(book.created_at) }}</span>
+        <div class="profile-section">
+          <h3 class="section-title">账号安全</h3>
+          <div class="security-item">
+            <span>修改密码</span>
+            <button class="link-btn" @click="showChangePassword = true">修改</button>
+          </div>
+        </div>
+
+        <!-- Tab 页签 -->
+        <div class="profile-section">
+          <div class="tab-container">
+            <div class="tab-buttons">
+              <button 
+                class="tab-btn" 
+                :class="{ active: activeTab === 'ratings' }"
+                @click="activeTab = 'ratings'"
+              >
+                我的评分
+              </button>
+              <button 
+                class="tab-btn" 
+                :class="{ active: activeTab === 'liked' }"
+                @click="activeTab = 'liked'"
+              >
+                感兴趣
+              </button>
+              <button 
+                class="tab-btn" 
+                :class="{ active: activeTab === 'disliked' }"
+                @click="activeTab = 'disliked'"
+              >
+                不感兴趣
+              </button>
+            </div>
+
+            <!-- 评分标签内容 -->
+            <div v-show="activeTab === 'ratings'" class="tab-content">
+              <div v-if="loadingRatings" class="loading-ratings">加载评分中...</div>
+              <div v-else-if="ratings.length === 0" class="no-ratings">暂无评分记录</div>
+              <div v-else class="ratings-list">
+                <div v-for="rating in ratings" :key="rating.id" class="rating-item">
+                  <div class="rating-book-info">
+                    <img :src="rating.book.cover_url" :alt="rating.book.title" class="rating-book-cover">
+                    <div class="rating-book-details">
+                      <h4 class="rating-book-title" @click="goToBookDetail(rating.book.book_id)">{{ rating.book.title }}</h4>
+                      <p class="rating-book-author">{{ rating.book.author }}</p>
+                      <div class="rating-time">
+                        <span>评分时间: {{ formatDate(rating.created_at) }}</span>
+                        <span v-if="rating.updated_at !== rating.created_at"> (更新于: {{ formatDate(rating.updated_at) }})</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="rating-actions">
+                    <div v-if="editingRating && editingRating.id === rating.id" class="rating-edit">
+                      <StarRating
+                        v-model:rating="editRatingScore"
+                      />
+                      <div class="rating-edit-buttons">
+                        <button class="save-rating-btn" @click="saveRating">保存</button>
+                        <button class="cancel-rating-btn" @click="cancelEditRating">取消</button>
+                      </div>
+                      <div v-if="ratingError" class="rating-error">{{ ratingError }}</div>
+                    </div>
+                    <div v-else class="rating-display">
+                      <div class="rating-score">{{ rating.score }}分</div>
+                      <div class="rating-buttons">
+                        <button class="edit-rating-btn" @click="startEditRating(rating)">编辑</button>
+                        <button class="delete-rating-btn" @click="deleteRating(rating.id)">删除</button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-            <div class="rating-actions">
-              <button class="delete-rating-btn" @click="deleteUserAction(book.id)">删除</button>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      <div class="profile-section">
-        <h3 class="section-title">不感兴趣的书籍</h3>
-        <div v-if="loadingDisinterests" class="loading-ratings">加载中...</div>
-        <div v-else-if="dislikedBooks.length === 0" class="no-ratings">暂无不感兴趣的书籍</div>
-        <div v-else class="ratings-list">
-          <div v-for="book in dislikedBooks" :key="book.id" class="rating-item">
-            <div class="rating-book-info">
-              <img :src="book.cover_url" :alt="book.title" class="rating-book-cover">
-              <div class="rating-book-details">
-                <h4 class="rating-book-title" @click="goToBookDetail(book.book_id)">{{ book.title }}</h4>
-                <p class="rating-book-author">{{ book.author }}</p>
-                <div class="rating-time">
-                  <span>添加时间: {{ formatDate(book.created_at) }}</span>
+            <!-- 感兴趣标签内容 -->
+            <div v-show="activeTab === 'liked'" class="tab-content">
+              <div v-if="loadingInterests" class="loading-ratings">加载中...</div>
+              <div v-else-if="likedBooks.length === 0" class="no-ratings">暂无感兴趣的书籍</div>
+              <div v-else class="ratings-list">
+                <div v-for="book in likedBooks" :key="book.id" class="rating-item">
+                  <div class="rating-book-info">
+                    <img :src="book.cover_url" :alt="book.title" class="rating-book-cover">
+                    <div class="rating-book-details">
+                      <h4 class="rating-book-title" @click="goToBookDetail(book.book_id)">{{ book.title }}</h4>
+                      <p class="rating-book-author">{{ book.author }}</p>
+                      <div class="rating-time">
+                        <span>添加时间: {{ formatDate(book.created_at) }}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="rating-actions">
+                    <button class="delete-rating-btn" @click="deleteUserAction(book.id)">删除</button>
+                  </div>
                 </div>
               </div>
             </div>
-            <div class="rating-actions">
-              <button class="delete-rating-btn" @click="deleteUserAction(book.id)">删除</button>
+
+            <!-- 不感兴趣标签内容 -->
+            <div v-show="activeTab === 'disliked'" class="tab-content">
+              <div v-if="loadingDisinterests" class="loading-ratings">加载中...</div>
+              <div v-else-if="dislikedBooks.length === 0" class="no-ratings">暂无不感兴趣的书籍</div>
+              <div v-else class="ratings-list">
+                <div v-for="book in dislikedBooks" :key="book.id" class="rating-item">
+                  <div class="rating-book-info">
+                    <img :src="book.cover_url" :alt="book.title" class="rating-book-cover">
+                    <div class="rating-book-details">
+                      <h4 class="rating-book-title" @click="goToBookDetail(book.book_id)">{{ book.title }}</h4>
+                      <p class="rating-book-author">{{ book.author }}</p>
+                      <div class="rating-time">
+                        <span>添加时间: {{ formatDate(book.created_at) }}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="rating-actions">
+                    <button class="delete-rating-btn" @click="deleteUserAction(book.id)">删除</button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-
-      <div class="profile-section">
-        <h3 class="section-title">操作</h3>
-        <button class="logout-btn" @click="goToReadingProfile">查看阅读基因画像</button>
-        <button class="logout-btn" @click="logout">退出登录</button>
-      </div>
+      </main>
     </div>
 
     <div class="modal" v-if="showChangePassword">
@@ -227,6 +261,7 @@ const user = ref({
 
 const isEditing = ref(false)
 const showChangePassword = ref(false)
+const activeTab = ref('ratings')
 
 const editForm = reactive({
   username: '',
@@ -564,18 +599,19 @@ onMounted(() => {
 <style scoped>
 .user-profile {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-  background: #ffffff;
+  background: #f9f9f9;
   min-height: 100vh;
-  padding-bottom: 48px;
+  padding-bottom: 64px;
 }
 
 .profile-header {
   background: #ffffff;
-  padding: 16px 24px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 20px 24px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
   display: flex;
   align-items: center;
   gap: 16px;
+  margin-bottom: 32px;
 }
 
 .back-btn {
@@ -588,11 +624,12 @@ onMounted(() => {
   font-size: 14px;
   font-weight: 400;
   letter-spacing: -0.14px;
-  transition: opacity 0.2s;
+  transition: all 0.2s ease;
 }
 
 .back-btn:hover {
   opacity: 0.85;
+  transform: translateY(-1px);
 }
 
 .back-btn:focus {
@@ -602,23 +639,37 @@ onMounted(() => {
 
 .profile-header h1 {
   margin: 0;
-  font-size: 20px;
-  font-weight: 540;
+  font-size: 24px;
+  font-weight: 600;
   letter-spacing: -0.26px;
   color: #000000;
 }
 
 .profile-container {
-  max-width: 800px;
-  margin: 24px auto;
+  max-width: 1200px;
+  margin: 0 auto;
   padding: 0 24px;
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 32px;
+}
+
+@media (max-width: 768px) {
+  .profile-container {
+    grid-template-columns: 1fr;
+    padding: 0 16px;
+  }
+}
+
+.profile-sidebar {
+  display: flex;
+  flex-direction: column;
 }
 
 .profile-card {
   background: #ffffff;
-  border-radius: 8px;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
   padding: 32px;
   text-align: center;
   margin-bottom: 24px;
@@ -627,16 +678,17 @@ onMounted(() => {
 .profile-avatar {
   position: relative;
   display: inline-block;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .profile-avatar img {
-  width: 100px;
-  height: 100px;
+  width: 120px;
+  height: 120px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid rgba(0, 0, 0, 0.08);
-  transition: opacity 0.2s;
+  border: 3px solid rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .avatar-upload-input {
@@ -658,79 +710,121 @@ onMounted(() => {
   color: #ffffff;
   border: none;
   border-radius: 50%;
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 12px;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: all 0.2s ease;
   z-index: 1;
   padding: 0;
   font-weight: 400;
   letter-spacing: -0.1px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .avatar-upload-btn:hover {
   opacity: 0.85;
+  transform: scale(1.05);
 }
 
 .profile-avatar:hover img {
   opacity: 0.8;
+  transform: scale(1.02);
 }
 
 .profile-username {
   font-size: 24px;
   color: #000000;
-  margin: 0 0 8px 0;
-  font-weight: 540;
+  margin: 0 0 12px 0;
+  font-weight: 600;
   letter-spacing: -0.26px;
 }
 
 .profile-email {
   font-size: 16px;
   color: #666666;
-  margin: 0;
-  font-weight: 330;
+  margin: 0 0 24px 0;
+  font-weight: 400;
   letter-spacing: -0.14px;
+}
+
+.sidebar-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sidebar-btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 50px;
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: -0.14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  background: #000000;
+  color: #ffffff;
+}
+
+.sidebar-btn:hover {
+  opacity: 0.85;
+  transform: translateY(-1px);
+}
+
+.sidebar-btn.logout-btn {
+  background: #ffffff;
+  color: #000000;
+  border: 1px solid #000000;
+}
+
+.sidebar-btn.logout-btn:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.profile-content {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
 }
 
 .profile-section {
   background: #ffffff;
-  border-radius: 8px;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  padding: 24px;
-  margin-bottom: 24px;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  padding: 32px;
 }
 
 .section-title {
-  font-size: 18px;
+  font-size: 20px;
   color: #000000;
-  margin: 0 0 20px 0;
-  font-weight: 540;
+  margin: 0 0 24px 0;
+  font-weight: 600;
   letter-spacing: -0.14px;
-  padding-left: 12px;
-  border-left: 2px solid #000000;
+  padding-left: 16px;
+  border-left: 3px solid #000000;
 }
 
 .info-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .form-group label {
   font-size: 14px;
   color: #666666;
-  font-weight: 320;
+  font-weight: 400;
   letter-spacing: -0.1px;
 }
 
@@ -739,14 +833,15 @@ onMounted(() => {
   border: 1px solid rgba(0, 0, 0, 0.15);
   border-radius: 50px;
   font-size: 16px;
-  font-weight: 330;
+  font-weight: 400;
   letter-spacing: -0.14px;
-  transition: border-color 0.2s;
+  transition: all 0.2s ease;
   outline: none;
 }
 
 .form-group input:focus {
   border-color: #000000;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
 }
 
 .form-group input:disabled {
@@ -767,7 +862,7 @@ onMounted(() => {
   font-weight: 400;
   letter-spacing: -0.14px;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: all 0.2s ease;
 }
 
 .edit-btn, .save-btn {
@@ -777,6 +872,7 @@ onMounted(() => {
 
 .edit-btn:hover, .save-btn:hover {
   opacity: 0.85;
+  transform: translateY(-1px);
 }
 
 .edit-btn:focus, .save-btn:focus {
@@ -792,22 +888,23 @@ onMounted(() => {
 
 .cancel-btn:hover {
   background: rgba(0, 0, 0, 0.12);
+  transform: translateY(-1px);
 }
 
 .action-buttons {
   display: flex;
-  gap: 0;
+  gap: 12px;
 }
 
 .security-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 0;
+  padding: 16px 0;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   font-size: 16px;
   color: #000000;
-  font-weight: 330;
+  font-weight: 400;
   letter-spacing: -0.14px;
 }
 
@@ -825,28 +922,11 @@ onMounted(() => {
   font-weight: 400;
   letter-spacing: -0.14px;
   text-decoration: underline;
+  transition: opacity 0.2s ease;
 }
 
 .link-btn:hover {
   opacity: 0.7;
-}
-
-.logout-btn {
-  background: #ffffff;
-  color: #000000;
-  border: 1px solid #000000;
-  width: 100%;
-  padding: 14px;
-  font-size: 16px;
-}
-
-.logout-btn:hover {
-  background: rgba(0, 0, 0, 0.04);
-}
-
-.logout-btn:focus {
-  outline: dashed 2px #000000;
-  outline-offset: 2px;
 }
 
 .modal {
@@ -872,10 +952,10 @@ onMounted(() => {
 
 .modal-content {
   background: #ffffff;
-  border-radius: 8px;
+  border-radius: 12px;
   width: 90%;
   max-width: 400px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
   position: relative;
   z-index: 1;
 }
@@ -892,7 +972,7 @@ onMounted(() => {
   margin: 0;
   font-size: 20px;
   color: #000000;
-  font-weight: 540;
+  font-weight: 600;
   letter-spacing: -0.26px;
 }
 
@@ -909,11 +989,12 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  transition: background 0.2s;
+  transition: all 0.2s ease;
 }
 
 .close-btn:hover {
   background: rgba(0, 0, 0, 0.12);
+  transform: scale(1.05);
 }
 
 .modal-body {
@@ -939,11 +1020,12 @@ onMounted(() => {
   font-weight: 400;
   letter-spacing: -0.14px;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: all 0.2s ease;
 }
 
 .primary-btn:hover {
   opacity: 0.85;
+  transform: translateY(-1px);
 }
 
 .primary-btn:focus {
@@ -951,12 +1033,52 @@ onMounted(() => {
   outline-offset: 2px;
 }
 
+/* Tab 页签样式 */
+.tab-container {
+  width: 100%;
+}
+
+.tab-buttons {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.tab-btn {
+  padding: 12px 24px;
+  border: none;
+  background: none;
+  font-size: 16px;
+  font-weight: 400;
+  color: #666666;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 2px solid transparent;
+  border-radius: 4px 4px 0 0;
+}
+
+.tab-btn:hover {
+  color: #000000;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.tab-btn.active {
+  color: #000000;
+  font-weight: 600;
+  border-bottom-color: #000000;
+}
+
+.tab-content {
+  min-height: 300px;
+}
+
 .loading-ratings, .no-ratings {
   text-align: center;
   padding: 48px 0;
   color: #666666;
   font-size: 16px;
-  font-weight: 320;
+  font-weight: 400;
 }
 
 .ratings-list {
@@ -967,15 +1089,18 @@ onMounted(() => {
 
 .rating-item {
   display: flex;
-  gap: 16px;
-  padding: 16px;
-  background: #fafafa;
-  border-radius: 8px;
-  transition: background 0.2s;
+  gap: 20px;
+  padding: 20px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .rating-item:hover {
-  background: #f0f0f0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
 }
 
 .rating-book-info {
@@ -986,12 +1111,18 @@ onMounted(() => {
 }
 
 .rating-book-cover {
-  width: 60px;
-  height: 80px;
-  border-radius: 4px;
+  width: 80px;
+  height: 100px;
+  border-radius: 8px;
   object-fit: cover;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.rating-book-cover:hover {
+  transform: scale(1.02);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
 }
 
 .rating-book-details {
@@ -999,12 +1130,12 @@ onMounted(() => {
 }
 
 .rating-book-title {
-  font-size: 16px;
-  font-weight: 450;
+  font-size: 18px;
+  font-weight: 600;
   color: #000000;
-  margin: 0 0 6px 0;
+  margin: 0 0 8px 0;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: opacity 0.2s ease;
   letter-spacing: -0.14px;
 }
 
@@ -1015,14 +1146,14 @@ onMounted(() => {
 .rating-book-author {
   font-size: 14px;
   color: #666666;
-  margin: 0 0 8px 0;
-  font-weight: 320;
+  margin: 0 0 12px 0;
+  font-weight: 400;
 }
 
 .rating-time {
   font-size: 12px;
-  color: #666666;
-  font-weight: 320;
+  color: #999999;
+  font-weight: 400;
 }
 
 .rating-actions {
@@ -1040,10 +1171,13 @@ onMounted(() => {
 }
 
 .rating-score {
-  font-size: 20px;
-  font-weight: 540;
+  font-size: 24px;
+  font-weight: 700;
   color: #000000;
   letter-spacing: -0.14px;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 8px 16px;
+  border-radius: 20px;
 }
 
 .rating-buttons {
@@ -1059,7 +1193,7 @@ onMounted(() => {
   font-weight: 400;
   letter-spacing: -0.14px;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: all 0.2s ease;
 }
 
 .edit-rating-btn {
@@ -1069,6 +1203,7 @@ onMounted(() => {
 
 .edit-rating-btn:hover {
   background: rgba(0, 0, 0, 0.12);
+  transform: translateY(-1px);
 }
 
 .delete-rating-btn {
@@ -1078,6 +1213,7 @@ onMounted(() => {
 
 .delete-rating-btn:hover {
   background: rgba(0, 0, 0, 0.12);
+  transform: translateY(-1px);
 }
 
 .rating-edit {
@@ -1101,6 +1237,7 @@ onMounted(() => {
 
 .save-rating-btn:hover {
   opacity: 0.85;
+  transform: translateY(-1px);
 }
 
 .cancel-rating-btn {
@@ -1110,6 +1247,7 @@ onMounted(() => {
 
 .cancel-rating-btn:hover {
   background: rgba(0, 0, 0, 0.12);
+  transform: translateY(-1px);
 }
 
 .rating-error {
@@ -1120,16 +1258,12 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
-  .profile-container {
-    padding: 0 16px;
-  }
-
   .profile-card {
     padding: 24px;
   }
 
   .profile-section {
-    padding: 20px;
+    padding: 24px;
   }
 
   .rating-item {
@@ -1139,8 +1273,8 @@ onMounted(() => {
   .rating-actions {
     align-items: flex-start;
     width: 100%;
-    margin-top: 12px;
-    padding-top: 12px;
+    margin-top: 16px;
+    padding-top: 16px;
     border-top: 1px solid rgba(0, 0, 0, 0.08);
   }
 
@@ -1157,19 +1291,29 @@ onMounted(() => {
   }
 
   .rating-book-cover {
-    width: 50px;
-    height: 67px;
+    width: 60px;
+    height: 80px;
+  }
+
+  .tab-buttons {
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .tab-btn {
+    flex-shrink: 0;
   }
 }
 
+/* 暗色模式 */
 .dark-mode .user-profile {
   background: #000000 !important;
   color: #ffffff !important;
 }
 
 .dark-mode .profile-header {
-  background: #000000;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: #0a0a0a;
+  box-shadow: 0 2px 10px rgba(255, 255, 255, 0.05);
 }
 
 .dark-mode .profile-header h1 {
@@ -1187,8 +1331,19 @@ onMounted(() => {
 
 .dark-mode .profile-card {
   background: #0a0a0a;
-  box-shadow: none;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 2px 10px rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.dark-mode .profile-avatar img {
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+}
+
+.dark-mode .avatar-upload-btn {
+  background: #ffffff;
+  color: #000000;
+  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.2);
 }
 
 .dark-mode .profile-username {
@@ -1199,10 +1354,29 @@ onMounted(() => {
   color: #b0b0b0;
 }
 
+.dark-mode .sidebar-btn {
+  background: #ffffff;
+  color: #000000;
+}
+
+.dark-mode .sidebar-btn:hover {
+  opacity: 0.85;
+}
+
+.dark-mode .sidebar-btn.logout-btn {
+  background: #000000;
+  color: #ffffff;
+  border: 1px solid #ffffff;
+}
+
+.dark-mode .sidebar-btn.logout-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .dark-mode .profile-section {
   background: #0a0a0a;
-  box-shadow: none;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 2px 10px rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .dark-mode .section-title {
@@ -1222,6 +1396,7 @@ onMounted(() => {
 
 .dark-mode .form-group input:focus {
   border-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
 }
 
 .dark-mode .form-group input:disabled {
@@ -1252,18 +1427,8 @@ onMounted(() => {
   color: #ffffff;
 }
 
-.dark-mode .logout-btn {
-  background: #000000;
-  color: #ffffff;
-  border: 1px solid #ffffff;
-}
-
-.dark-mode .logout-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-
 .dark-mode .modal-content {
-  background: #000000;
+  background: #0a0a0a;
 }
 
 .dark-mode .modal-header {
@@ -1283,16 +1448,49 @@ onMounted(() => {
   background: rgba(255, 255, 255, 0.16);
 }
 
+.dark-mode .primary-btn {
+  background: #ffffff;
+  color: #000000;
+}
+
+.dark-mode .tab-buttons {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark-mode .tab-btn {
+  color: #b0b0b0;
+}
+
+.dark-mode .tab-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.dark-mode .tab-btn.active {
+  color: #ffffff;
+  border-bottom-color: #ffffff;
+}
+
 .dark-mode .loading-ratings, .dark-mode .no-ratings {
   color: #b0b0b0;
 }
 
 .dark-mode .rating-item {
   background: #1a1a1a;
+  border-color: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.05);
 }
 
 .dark-mode .rating-item:hover {
-  background: #2a2a2a;
+  box-shadow: 0 4px 16px rgba(255, 255, 255, 0.1);
+}
+
+.dark-mode .rating-book-cover {
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+}
+
+.dark-mode .rating-book-cover:hover {
+  box-shadow: 0 6px 16px rgba(255, 255, 255, 0.15);
 }
 
 .dark-mode .rating-book-title {
@@ -1304,11 +1502,12 @@ onMounted(() => {
 }
 
 .dark-mode .rating-time {
-  color: #b0b0b0;
+  color: #888888;
 }
 
 .dark-mode .rating-score {
-  color: #e0e0e0;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .dark-mode .edit-rating-btn {

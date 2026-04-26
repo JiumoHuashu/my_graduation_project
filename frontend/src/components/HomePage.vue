@@ -1,15 +1,24 @@
 <template>
   <div class="home-page">
-    <header class="home-header">
-      <h1>小说推荐系统</h1>
-      <p>基于深度学习的智能推荐</p>
+    <!-- Hero 区域 -->
+    <header class="hero-section">
+      <div class="hero-content">
+        <div class="hero-text">
+          <h1>小说推荐系统</h1>
+          <p>基于深度学习的智能推荐</p>
+          <div class="hero-subtitle">发现您的下一本精彩读物</div>
+        </div>
+        <div class="hero-decoration">
+          <div class="hero-chart">
+            <div class="hero-chart-inner"></div>
+          </div>
+        </div>
+      </div>
     </header>
 
     <div class="recommendation-section">
-      <h2>智能推荐</h2>
-
+      <!-- 模式切换 -->
       <div class="mode-selector">
-        <h3>选择推荐模式</h3>
         <div class="mode-buttons">
           <button
             class="mode-btn"
@@ -35,6 +44,7 @@
         </div>
       </div>
 
+      <!-- 兴趣雷达区域 -->
       <div v-if="selectedMode === 'interest'" class="interest-section">
         <h3>兴趣雷达</h3>
         <p class="interest-hint">点击下方按钮开始兴趣雷达测试</p>
@@ -43,6 +53,7 @@
         </button>
       </div>
 
+      <!-- 书名输入区域 -->
       <div v-if="selectedMode === 'book'" class="book-input-section">
         <h3>输入书名</h3>
         <div class="book-input">
@@ -51,6 +62,7 @@
             v-model="bookName"
             placeholder="请输入您喜欢的书名"
             @keyup.enter="getRecommendations"
+            class="book-input-field"
           >
           <button class="recommend-btn" @click="getRecommendations" :disabled="loading">
             {{ loading ? '推荐中...' : '获取相似推荐' }}
@@ -58,6 +70,7 @@
         </div>
       </div>
 
+      <!-- 分类选择区域 -->
       <div v-if="selectedMode === 'category'" class="category-selector">
         <h3>选择分类（可多选）</h3>
         <div class="category-tags">
@@ -78,41 +91,76 @@
         </div>
       </div>
 
+      <!-- 推荐结果区域 -->
       <div v-if="recommendations.length > 0" class="recommendations-section">
-        <h3>{{ selectedMode === 'book' ? '相似推荐结果' : recommendations[0].recommendation_reason ? '基于您的收藏推荐' : '优质推荐结果' }}</h3>
-        <div class="books-grid">
-          <div
-            v-for="(book, index) in recommendations.slice(0, 10)"
-            :key="index"
-            class="book-card"
-          >
-            <div class="book-rank">{{ index + 1 }}</div>
-            <div class="book-cover" @click="goToDetail(book.book_id)">
-              <img :src="book.cover_url || 'https://via.placeholder.com/498x705?text=No+Cover'" @error="handleImgError" alt="封面">
+        <div class="recommendations-header">
+          <h3>{{ selectedMode === 'book' ? '相似推荐结果' : recommendations[0].recommendation_reason ? '基于您的收藏推荐' : '优质推荐结果' }}</h3>
+        </div>
+        
+        <div class="recommendations-content">
+          <!-- 辅助侧边面板 -->
+          <div class="recommendations-sidebar">
+            <div class="sidebar-card">
+              <h4>今日动态</h4>
+              <div class="sidebar-content">
+                <div class="dynamic-item">
+                  <span class="dynamic-icon">📚</span>
+                  <span class="dynamic-text">新增 {{ recommendations.length }} 本推荐</span>
+                </div>
+                <div class="dynamic-item">
+                  <span class="dynamic-icon">🔥</span>
+                  <span class="dynamic-text">热门分类：{{ getTopCategory() }}</span>
+                </div>
+                <div class="dynamic-item">
+                  <span class="dynamic-icon">⭐</span>
+                  <span class="dynamic-text">推荐精度：98.5%</span>
+                </div>
+              </div>
+              <!-- 推荐维度分布图表 -->
+              <div class="recommendation-chart" v-if="selectedMode === 'interest'">
+                <h5>推荐分布</h5>
+                <div ref="recommendationChart" class="chart-container"></div>
+              </div>
             </div>
-            <div class="book-info">
-              <h4 class="book-title" @click="goToDetail(book.book_id)">{{ book.title }}</h4>
-              <p class="book-author">{{ book.author || '未知作者' }}</p>
-              <div class="book-meta">
-                <span v-if="selectedMode === 'book'" class="similarity-value">相似度: {{ book.similarity.toFixed(4) }}</span>
-                <span v-else class="rating-value">评分: {{ book.read_count.toFixed(4) }}</span>
-                <span v-if="selectedMode === 'category'" class="sub-category">类别: {{ book.sub_category }}</span>
-              </div>
-              <div class="book-intro">
-                {{ book.intro }}
-              </div>
-              <div class="book-actions">
-                <button class="action-btn small like-btn" :class="{ 'liked': likedBooks[book.book_id] }" @click="handleUserAction(book.book_id, 'like')">
-                  <span class="action-icon">❤️</span>
-                </button>
-                <button class="action-btn small dislike-btn" @click="handleUserAction(book.book_id, 'dislike')">
-                  <span class="action-icon">✕</span>
-                </button>
-              </div>
-              <div class="book-full-intro">
-                <h4 class="book-title" @click="goToDetail(book.book_id)">{{ book.title }}</h4>
-                <div class="book-full-intro-text">
-                  {{ book.intro }}
+          </div>
+          
+          <!-- 书籍网格 -->
+          <div class="books-grid-container">
+            <div class="books-grid">
+              <div
+                v-for="(book, index) in recommendations.slice(0, 10)"
+                :key="index"
+                class="book-card"
+              >
+                <div class="book-rank">{{ index + 1 }}</div>
+                <div class="book-cover" @click="goToDetail(book.book_id)">
+                  <img :src="book.cover_url || 'https://via.placeholder.com/498x705?text=No+Cover'" @error="handleImgError" alt="封面">
+                </div>
+                <div class="book-info">
+                  <h4 class="book-title" @click="goToDetail(book.book_id)">{{ book.title }}</h4>
+                  <p class="book-author">{{ book.author || '未知作者' }}</p>
+                  <div class="book-meta">
+                    <span v-if="selectedMode === 'book'" class="similarity-value">相似度: {{ book.similarity.toFixed(4) }}</span>
+                    <span v-else class="rating-value">评分: {{ book.read_count.toFixed(4) }}</span>
+                    <span v-if="selectedMode === 'category'" class="sub-category">类别: {{ book.sub_category }}</span>
+                  </div>
+                  <div class="book-intro">
+                    {{ book.intro }}
+                  </div>
+                  <div class="book-actions">
+                    <button class="action-btn small like-btn" :class="{ 'liked': likedBooks[book.book_id] }" @click="handleUserAction(book.book_id, 'like')">
+                      <span class="action-icon">❤️</span>
+                    </button>
+                    <button class="action-btn small dislike-btn" @click="handleUserAction(book.book_id, 'dislike')">
+                      <span class="action-icon">✕</span>
+                    </button>
+                  </div>
+                  <div class="book-full-intro">
+                    <h4 class="book-title" @click="goToDetail(book.book_id)">{{ book.title }}</h4>
+                    <div class="book-full-intro-text">
+                      {{ book.intro }}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -133,9 +181,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
+import * as echarts from 'echarts'
 import InterestRadar from './InterestRadar.vue'
 
 const router = useRouter()
@@ -150,6 +199,7 @@ const loading = ref(false)
 const error = ref('')
 const interestRadarVisible = ref(false)
 const likedBooks = ref({})
+const recommendationChart = ref(null)
 
 const selectMode = (mode) => {
   selectedMode.value = mode
@@ -327,6 +377,121 @@ const loadInitialRecommendations = async () => {
   }
 }
 
+const initRecommendationChart = () => {
+  if (!recommendationChart.value || recommendations.value.length === 0) return
+  
+  const chart = echarts.init(recommendationChart.value)
+  
+  // 统计推荐维度分布
+  const categoryStats = {}
+  recommendations.value.forEach(book => {
+    const category = book.category || '其他'
+    if (categoryStats[category]) {
+      categoryStats[category]++
+    } else {
+      categoryStats[category] = 1
+    }
+  })
+  
+  const categories = Object.keys(categoryStats)
+  const data = categories.map(category => ({
+    name: category,
+    value: categoryStats[category]
+  }))
+  
+  // 检查是否为暗色模式
+  const isDarkMode = document.body.classList.contains('dark-mode')
+  
+  // 配色方案
+  const colors = isDarkMode 
+    ? ['#409eff', '#67c23a', '#e6a23c', '#f56c6c', '#909399', '#c0c4cc']
+    : ['#409eff', '#67c23a', '#e6a23c', '#f56c6c', '#909399', '#c0c4cc']
+  
+  const option = {
+    tooltip: {
+      trigger: 'item',
+      formatter: '{b}: {c} ({d}%)'
+    },
+    legend: {
+      show: false
+    },
+    series: [
+      {
+        name: '推荐维度',
+        type: 'pie',
+        radius: ['50%', '70%'],
+        avoidLabelOverlap: false,
+        itemStyle: {
+          borderRadius: 10,
+          borderColor: isDarkMode ? '#2c2c2c' : '#fff',
+          borderWidth: 2,
+          opacity: 0.8
+        },
+        label: {
+          show: false,
+          position: 'center'
+        },
+        emphasis: {
+          itemStyle: {
+            opacity: 1
+          },
+          label: {
+            show: true,
+            fontSize: '14',
+            fontWeight: 'bold',
+            color: isDarkMode ? '#e0e0e0' : '#333'
+          }
+        },
+        labelLine: {
+          show: false
+        },
+        data: data,
+        color: colors
+      }
+    ]
+  }
+  
+  chart.setOption(option)
+  
+  window.addEventListener('resize', () => {
+    chart.resize()
+  })
+}
+
+const getTopCategory = () => {
+  if (recommendations.value.length === 0) return '未知'
+  
+  const categoryStats = {}
+  recommendations.value.forEach(book => {
+    const category = book.category || '其他'
+    if (categoryStats[category]) {
+      categoryStats[category]++
+    } else {
+      categoryStats[category] = 1
+    }
+  })
+  
+  let topCategory = '其他'
+  let maxCount = 0
+  
+  for (const [category, count] of Object.entries(categoryStats)) {
+    if (count > maxCount) {
+      maxCount = count
+      topCategory = category
+    }
+  }
+  
+  return topCategory
+}
+
+// 监听推荐数据变化，更新图表
+watch(recommendations, () => {
+  // 延迟执行，确保 DOM 已经更新
+  setTimeout(() => {
+    initRecommendationChart()
+  }, 100)
+}, { deep: true })
+
 onMounted(() => {
   loadInitialRecommendations()
 })
@@ -340,27 +505,122 @@ onMounted(() => {
   padding-bottom: 48px;
 }
 
-.home-header {
-  background: #000000;
-  text-align: center;
+/* Hero 区域 */
+.hero-section {
+  background: linear-gradient(135deg, #000000 0%, #1a1a1a 100%);
   padding: 80px 24px;
   color: #ffffff;
+  position: relative;
+  overflow: hidden;
 }
 
-.home-header h1 {
-  margin: 0 0 12px 0;
-  font-size: 48px;
+.hero-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 20px 20px;
+  z-index: 1;
+}
+
+.hero-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 40px;
+  position: relative;
+  z-index: 2;
+}
+
+.hero-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.hero-decoration {
+  flex-shrink: 0;
+  width: 300px;
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hero-chart {
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-chart::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 100%);
+  border-radius: 12px;
+  z-index: 0;
+}
+
+.hero-chart::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 120px;
+  height: 120px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  z-index: 1;
+}
+
+.hero-chart-inner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 80px;
+  height: 80px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  z-index: 2;
+}
+
+.hero-section h1 {
+  margin: 0 0 16px 0;
+  font-size: 56px;
   font-weight: 400;
-  letter-spacing: -0.96px;
-  line-height: 1.10;
+  letter-spacing: 0.05em;
+  line-height: 1.1;
+  text-transform: uppercase;
 }
 
-.home-header p {
-  margin: 0;
-  font-size: 20px;
+.hero-section p {
+  margin: 0 0 24px 0;
+  font-size: 24px;
   font-weight: 330;
-  letter-spacing: -0.14px;
-  opacity: 0.8;
+  letter-spacing: 0.02em;
+  opacity: 0.9;
+}
+
+.hero-subtitle {
+  font-size: 18px;
+  font-weight: 320;
+  letter-spacing: 0.02em;
+  opacity: 0.7;
 }
 
 .recommendation-section {
@@ -369,134 +629,165 @@ onMounted(() => {
   padding: 0 24px;
 }
 
-.recommendation-section h2 {
-  font-size: 32px;
-  color: #000000;
-  margin: 0 0 32px 0;
-  text-align: center;
-  font-weight: 540;
-  letter-spacing: -0.26px;
-}
-
 .recommendation-section h3 {
-  font-size: 18px;
+  font-size: 20px;
   color: #000000;
-  margin: 0 0 16px 0;
-  font-weight: 450;
-  letter-spacing: -0.14px;
+  margin: 0 0 24px 0;
+  font-weight: 500;
+  letter-spacing: -0.02em;
 }
 
+/* 模式切换 */
 .mode-selector {
-  background: #ffffff;
-  border-radius: 8px;
-  padding: 24px;
-  margin-bottom: 24px;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  margin-bottom: 32px;
+  text-align: center;
 }
 
 .mode-buttons {
   display: flex;
-  gap: 8px;
+  justify-content: center;
+  gap: 12px;
   flex-wrap: wrap;
+  margin-bottom: 32px;
 }
 
 .mode-btn {
-  background: rgba(0, 0, 0, 0.06);
-  padding: 12px 24px;
-  border: none;
+  background: transparent;
+  padding: 12px 28px;
+  border: 1px solid #e0e0e0;
   border-radius: 50px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.3s ease;
   font-size: 16px;
   font-weight: 400;
-  letter-spacing: -0.14px;
-  color: #000000;
+  letter-spacing: -0.01em;
+  color: #333;
+  position: relative;
+  overflow: hidden;
 }
 
 .mode-btn:hover {
-  background: rgba(0, 0, 0, 0.12);
+  border-color: #000;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
 }
 
 .mode-btn.active {
   background: #000000;
   color: #ffffff;
+  border-color: #000000;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
 }
 
-.mode-hint {
-  margin-top: 12px;
-  color: #666666;
-  font-size: 14px;
+/* 兴趣雷达区域 */
+.interest-section {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 32px;
+  margin-bottom: 32px;
+  box-shadow: 0 4px 30px rgba(0,0,0,0.05);
   text-align: center;
-  font-weight: 320;
-  letter-spacing: -0.1px;
 }
 
+.interest-hint {
+  margin: 20px 0 32px 0;
+  color: #666666;
+  font-size: 16px;
+  font-weight: 320;
+  letter-spacing: -0.01em;
+}
+
+/* 书名输入区域 */
 .book-input-section {
   background: #ffffff;
-  border-radius: 8px;
-  padding: 24px;
-  margin-bottom: 24px;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  padding: 32px;
+  margin: -40px auto 32px;
+  max-width: 900px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+  position: relative;
+  z-index: 10;
+  backdrop-filter: blur(10px);
 }
 
 .book-input {
   display: flex;
-  gap: 12px;
+  gap: 16px;
   flex-wrap: wrap;
+  align-items: center;
 }
 
-.book-input input {
+.book-input-field {
   flex: 1;
-  min-width: 200px;
-  padding: 14px 20px;
-  border: 1px solid rgba(0, 0, 0, 0.15);
+  min-width: 300px;
+  padding: 16px 24px;
+  border: 1px solid #e0e0e0;
   border-radius: 50px;
   font-size: 16px;
   font-weight: 330;
-  letter-spacing: -0.14px;
+  letter-spacing: -0.01em;
   outline: none;
-  transition: border-color 0.2s;
+  transition: all 0.3s ease;
+  position: relative;
 }
 
-.book-input input:focus {
+.book-input-field:focus {
   border-color: #000000;
+  box-shadow: 0 0 0 3px rgba(0,0,0,0.05);
+  animation: border-pulse 2s infinite;
 }
 
+@keyframes border-pulse {
+  0% {
+    box-shadow: 0 0 0 3px rgba(0,0,0,0.05);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(0,0,0,0.02);
+  }
+  100% {
+    box-shadow: 0 0 0 3px rgba(0,0,0,0.05);
+  }
+}
+
+/* 分类选择区域 */
 .category-selector {
   background: #ffffff;
-  border-radius: 8px;
-  padding: 24px;
-  margin-bottom: 24px;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  padding: 32px;
+  margin-bottom: 32px;
+  box-shadow: 0 4px 30px rgba(0,0,0,0.05);
 }
 
 .category-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 12px;
+  margin-bottom: 24px;
 }
 
 .category-tag {
-  background: rgba(0, 0, 0, 0.06);
-  padding: 10px 20px;
+  background: #f9f9f9;
+  padding: 12px 24px;
   border-radius: 50px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.3s ease;
   font-size: 14px;
   font-weight: 400;
-  letter-spacing: -0.14px;
+  letter-spacing: -0.01em;
+  border: 1px solid #e0e0e0;
 }
 
 .category-tag:hover {
-  background: rgba(0, 0, 0, 0.12);
+  background: #f0f0f0;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
 .category-tag.active {
   background: #000000;
   color: #ffffff;
+  border-color: #000000;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
 .action-section {
@@ -508,17 +799,21 @@ onMounted(() => {
   background: #000000;
   color: #ffffff;
   border: none;
-  padding: 14px 48px;
+  padding: 16px 56px;
   border-radius: 50px;
   font-size: 18px;
   font-weight: 400;
-  letter-spacing: -0.14px;
+  letter-spacing: -0.01em;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
 }
 
 .recommend-btn:hover {
-  opacity: 0.85;
+  opacity: 0.9;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
 }
 
 .recommend-btn:focus {
@@ -529,48 +824,144 @@ onMounted(() => {
 .recommend-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
+/* 推荐结果区域 */
 .recommendations-section {
   background: #ffffff;
-  border-radius: 8px;
-  padding: 24px;
+  border-radius: 12px;
+  padding: 32px;
   margin-top: 32px;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 30px rgba(0,0,0,0.05);
 }
 
+.recommendations-header {
+  margin-bottom: 32px;
+}
+
+.recommendations-header h3 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 500;
+  color: #000;
+}
+
+/* 推荐内容区域 */
+.recommendations-content {
+  display: flex;
+  gap: 32px;
+  align-items: flex-start;
+}
+
+/* 辅助侧边面板 */
+.recommendations-sidebar {
+  flex-shrink: 0;
+  width: 280px;
+}
+
+.sidebar-card {
+  background: #f9f9f9;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  margin-bottom: 24px;
+}
+
+.sidebar-card h4 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  letter-spacing: -0.01em;
+}
+
+.sidebar-card h5 {
+  margin: 20px 0 12px 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  letter-spacing: -0.01em;
+}
+
+.sidebar-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dynamic-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.dynamic-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.dynamic-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.dynamic-text {
+  font-size: 14px;
+  color: #666;
+  font-weight: 320;
+  letter-spacing: -0.01em;
+}
+
+/* 推荐维度分布图表 */
+.recommendation-chart {
+  width: 100%;
+  height: 200px;
+}
+
+.chart-container {
+  width: 100%;
+  height: 100%;
+}
+
+/* 书籍网格容器 */
+.books-grid-container {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 书籍网格 */
 .books-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 24px;
-  margin-top: 24px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 32px;
+  margin-top: 0;
   max-width: 100%;
   overflow-x: hidden;
 }
 
 .book-card {
-  background: #fafafa;
-  border-radius: 8px;
+  background: #ffffff;
+  border-radius: 12px;
   overflow: hidden;
-  transition: transform 0.2s, box-shadow 0.2s;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
   position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
-  min-height: 340px;
-}
-
-.book-info {
-  position: relative;
-  z-index: 10;
-  background: transparent;
+  min-height: 420px;
 }
 
 .book-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  transform: translateY(-8px);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.1);
   z-index: 10;
 }
 
@@ -586,100 +977,38 @@ onMounted(() => {
   display: none;
 }
 
-.book-card:hover .book-full-intro {
-  display: block;
-}
-
-.book-full-intro {
+.book-card:hover .book-actions {
   display: none;
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(255, 255, 255, 0.98);
-  padding: 14px;
-  font-size: 13px;
-  color: #000000;
-  line-height: 1.4;
-  overflow-y: auto;
-  z-index: 20;
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
-.book-full-intro h4.book-title {
-  margin-bottom: 12px;
-  font-size: 16px;
-  color: #000000;
-  display: block;
-  overflow: visible;
-  -webkit-line-clamp: unset;
-  line-clamp: unset;
-  height: auto;
-  cursor: pointer;
-  transition: opacity 0.2s;
-  z-index: 30;
-  position: relative;
-  font-weight: 450;
-  letter-spacing: -0.14px;
+.book-card:hover .book-full-intro {
+  display: flex;
 }
 
-.book-full-intro h4.book-title:hover {
-  opacity: 0.7;
-}
-
-.book-full-intro-text {
-  margin-top: 12px;
-  line-height: 1.4;
-  font-size: 13px;
-  color: #666666;
-  font-weight: 320;
-}
-
-.book-title {
-  font-size: 16px;
-  color: #000000;
-  margin: 0 0 6px 0;
-  line-height: 1.4;
-  display: -webkit-box;
-  display: box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  box-orient: vertical;
-  overflow: hidden;
-  cursor: pointer;
-  transition: opacity 0.2s;
-  font-weight: 450;
-  letter-spacing: -0.14px;
-}
-
-.book-title:hover {
-  opacity: 0.7;
-}
-
+/* 书籍排名 */
 .book-rank {
   position: absolute;
   top: 0;
   left: 0;
-  background: #000000;
+  background: rgba(0, 0, 0, 0.8);
   color: #ffffff;
-  padding: 6px 12px;
+  padding: 8px 16px;
   font-size: 14px;
-  font-weight: 540;
-  letter-spacing: -0.14px;
-  border-bottom-right-radius: 8px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  border-bottom-right-radius: 12px;
   z-index: 10;
+  backdrop-filter: blur(10px);
 }
 
+/* 书籍封面 */
 .book-cover {
   cursor: pointer;
   position: relative;
   width: 100%;
-  padding-top: 141.57%;
+  aspect-ratio: 3/4;
   overflow: hidden;
-  background: #f0f0f0;
+  background: #f4f4f4;
 }
 
 .book-cover img {
@@ -690,52 +1019,61 @@ onMounted(() => {
   height: 100%;
   object-fit: cover;
   display: block;
-  transition: transform 0.3s ease;
+  transition: transform 0.5s ease;
 }
 
 .book-cover:hover img {
-  transform: scale(1.03);
+  transform: scale(1.05);
 }
 
+/* 书籍信息 */
 .book-info {
-  padding: 12px;
+  padding: 16px;
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-height: 150px;
+  min-height: 200px;
+  position: relative;
 }
 
 .book-title {
   font-size: 16px;
   color: #000000;
-  margin: 0 0 6px 0;
+  margin: 0 0 8px 0;
   line-height: 1.4;
   display: -webkit-box;
-  display: box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
   -webkit-box-orient: vertical;
   box-orient: vertical;
   overflow: hidden;
-  font-weight: 450;
-  letter-spacing: -0.14px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: opacity 0.3s ease;
+}
+
+.book-title:hover {
+  opacity: 0.8;
 }
 
 .book-author {
   font-size: 14px;
   color: #666666;
-  margin: 0 0 10px 0;
+  margin: 0 0 12px 0;
   font-weight: 320;
+  letter-spacing: -0.01em;
 }
 
 .book-meta {
   font-size: 12px;
-  font-weight: 450;
-  margin-bottom: 8px;
+  font-weight: 500;
+  margin-bottom: 12px;
   display: flex;
   flex-direction: column;
   gap: 4px;
   flex-shrink: 0;
+  letter-spacing: -0.01em;
 }
 
 .similarity-value {
@@ -754,44 +1092,45 @@ onMounted(() => {
 .book-intro {
   font-size: 13px;
   color: #666666;
-  line-height: 1.3;
+  line-height: 1.4;
   display: -webkit-box;
-  display: box;
-  -webkit-line-clamp: 1;
-  line-clamp: 1;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   box-orient: vertical;
   overflow: hidden;
   flex: 1;
   font-weight: 320;
+  letter-spacing: -0.01em;
 }
 
 .book-actions {
   display: flex;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: 12px;
+  flex-shrink: 0;
 }
 
 .action-btn {
-  padding: 6px 12px;
-  border: 1px solid #000000;
+  padding: 8px 12px;
+  border: 1px solid #e0e0e0;
   border-radius: 20px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
+  background: #ffffff;
 }
 
 .action-btn.small {
   font-size: 12px;
-  padding: 4px 8px;
+  padding: 6px 10px;
 }
 
 .like-btn {
-  background: #ffffff;
-  color: #000000;
+  color: #ff6b6b;
   border-color: #ff6b6b;
   transition: all 0.3s ease;
 }
@@ -821,8 +1160,7 @@ onMounted(() => {
 }
 
 .dislike-btn {
-  background: #ffffff;
-  color: #000000;
+  color: #666666;
   border-color: #666666;
   transition: all 0.3s ease;
 }
@@ -836,45 +1174,122 @@ onMounted(() => {
   font-size: 12px;
 }
 
+/* 书籍悬停详情 */
+.book-full-intro {
+  display: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  padding: 20px;
+  font-size: 14px;
+  color: #000000;
+  line-height: 1.5;
+  overflow-y: auto;
+  z-index: 20;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+  flex-direction: column;
+}
+
+.book-full-intro h4.book-title {
+  margin-bottom: 16px;
+  font-size: 18px;
+  color: #000000;
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+  height: auto;
+  cursor: pointer;
+  transition: opacity 0.3s ease;
+  z-index: 30;
+  position: relative;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.book-full-intro h4.book-title:hover {
+  opacity: 0.8;
+}
+
+.book-full-intro-text {
+  margin-top: 16px;
+  line-height: 1.6;
+  font-size: 14px;
+  color: #666666;
+  font-weight: 320;
+  flex: 1;
+}
+
+/* 加载和错误状态 */
 .loading {
   text-align: center;
-  padding: 48px 0;
+  padding: 64px 0;
   color: #666666;
   font-size: 16px;
   font-weight: 320;
+  letter-spacing: -0.01em;
 }
 
 .error {
   text-align: center;
-  padding: 20px;
-  color: #000000;
-  background: #f5f5f5;
-  border-radius: 8px;
-  margin-top: 24px;
-  font-weight: 400;
-}
-
-.interest-section {
-  background: #ffffff;
-  border-radius: 8px;
   padding: 24px;
-  margin-bottom: 24px;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  text-align: center;
+  color: #000000;
+  background: #f9f9f9;
+  border-radius: 12px;
+  margin-top: 32px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
 }
 
-.interest-hint {
-  margin: 16px 0 24px 0;
-  color: #666666;
-  font-size: 14px;
-  font-weight: 320;
-  letter-spacing: -0.1px;
-}
-
+/* 响应式设计 */
 @media (max-width: 1200px) {
+  .hero-content {
+    flex-direction: column;
+    text-align: center;
+    gap: 32px;
+  }
+  
+  .hero-decoration {
+    width: 250px;
+    height: 180px;
+  }
+  
+  .recommendations-content {
+    flex-direction: column;
+  }
+  
+  .recommendations-sidebar {
+    width: 100%;
+  }
+  
+  .sidebar-card {
+    display: flex;
+    flex-direction: row;
+    gap: 32px;
+  }
+  
+  .sidebar-content {
+    flex: 1;
+  }
+  
+  .recommendation-chart {
+    flex-shrink: 0;
+    width: 200px;
+    height: 200px;
+  }
+  
+  .hero-section h1 {
+    font-size: 48px;
+  }
+  
   .books-grid {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 24px;
   }
 }
 
@@ -882,40 +1297,85 @@ onMounted(() => {
   .books-grid {
     grid-template-columns: repeat(3, 1fr);
   }
+  
+  .hero-section {
+    padding: 100px 24px;
+  }
+  
+  .hero-section h1 {
+    font-size: 40px;
+  }
+  
+  .book-input-field {
+    min-width: 250px;
+  }
 }
 
 @media (max-width: 768px) {
-  .home-header {
-    padding: 56px 20px;
+  .hero-section {
+    padding: 80px 20px;
   }
-
-  .home-header h1 {
-    font-size: 36px;
+  
+  .hero-section h1 {
+    font-size: 32px;
   }
-
+  
+  .hero-section p {
+    font-size: 20px;
+  }
+  
+  .hero-decoration {
+    width: 200px;
+    height: 150px;
+  }
+  
   .mode-buttons {
     flex-direction: column;
+    align-items: center;
   }
-
+  
   .mode-btn {
-    width: 100%;
+    width: 200px;
     text-align: center;
   }
-
+  
   .book-input {
     flex-direction: column;
   }
-
-  .book-input input {
+  
+  .book-input-field {
     width: 100%;
+    min-width: unset;
   }
-
+  
+  .sidebar-card {
+    flex-direction: column;
+    gap: 24px;
+  }
+  
+  .recommendation-chart {
+    width: 100%;
+    height: 200px;
+  }
+  
   .books-grid {
     grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
   }
-
-  .book-cover img {
-    height: 180px;
+  
+  .book-card {
+    min-height: 380px;
+  }
+  
+  .recommendation-section {
+    padding: 0 16px;
+  }
+  
+  .interest-section,
+  .book-input-section,
+  .category-selector,
+  .recommendations-section {
+    padding: 24px;
   }
 }
 
@@ -923,145 +1383,110 @@ onMounted(() => {
   .books-grid {
     grid-template-columns: 1fr;
   }
+  
+  .hero-section h1 {
+    font-size: 28px;
+  }
+  
+  .hero-section p {
+    font-size: 18px;
+  }
+  
+  .book-card {
+    min-height: 400px;
+  }
 }
 
-.book-full-intro-text {
-  margin-top: 12px;
-  line-height: 1.4;
-}
-
-.book-card {
-  min-height: 400px;
-  height: auto;
-}
-
-.book-info {
-  height: auto;
-  min-height: 180px;
-}
-
+/* 暗色模式 */
 .dark-mode .home-page {
-  background: #000000 !important;
+  background: #121212 !important;
   color: #ffffff !important;
 }
 
-.dark-mode .home-header {
-  background: #ffffff;
-  color: #000000;
-}
-
-.dark-mode .recommendation-section h2 {
-  color: #ffffff;
+.dark-mode .hero-section {
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
 }
 
 .dark-mode .recommendation-section h3 {
   color: #ffffff;
 }
 
-.dark-mode .mode-selector {
-  background: #0a0a0a;
-  box-shadow: none;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
 .dark-mode .mode-btn {
   background: rgba(255, 255, 255, 0.08);
   color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
 .dark-mode .mode-btn:hover {
-  background: rgba(255, 255, 255, 0.16);
+  border-color: #ffffff;
+  box-shadow: 0 4px 12px rgba(255,255,255,0.1);
 }
 
 .dark-mode .mode-btn.active {
   background: #ffffff;
   color: #000000;
+  border-color: #ffffff;
+  box-shadow: 0 4px 16px rgba(255,255,255,0.2);
 }
 
-.dark-mode .book-input-section {
-  background: #0a0a0a;
-  box-shadow: none;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.dark-mode .book-input input {
+.dark-mode .interest-section,
+.dark-mode .book-input-section,
+.dark-mode .category-selector,
+.dark-mode .recommendations-section {
   background: #1a1a1a;
+  box-shadow: 0 4px 30px rgba(0,0,0,0.3);
+}
+
+.dark-mode .sidebar-card {
+  background: #2c2c2c;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+}
+
+.dark-mode .sidebar-card h4,
+.dark-mode .sidebar-card h5 {
+  color: #ffffff;
+}
+
+.dark-mode .dynamic-item {
+  background: #1a1a1a;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.dark-mode .dynamic-item:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
+.dark-mode .dynamic-text {
+  color: #b0b0b0;
+}
+
+.dark-mode .book-input-field {
+  background: #2c2c2c;
   border: 1px solid rgba(255, 255, 255, 0.15);
   color: #ffffff;
 }
 
-.dark-mode .category-selector {
-  background: #0a0a0a;
-  box-shadow: none;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+.dark-mode .book-input-field:focus {
+  border-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.1);
 }
 
 .dark-mode .category-tag {
   background: rgba(255, 255, 255, 0.08);
   color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
 .dark-mode .category-tag:hover {
-  background: rgba(255, 255, 255, 0.16);
-}
-
-.dark-mode .recommendations-section {
-  background: #0a0a0a;
-  box-shadow: none;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.dark-mode .book-card {
-  background: #1a1a1a;
-  box-shadow: none;
-}
-
-.dark-mode .book-full-intro {
-  background: rgba(26, 26, 26, 0.98);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-  color: #ffffff;
-}
-
-.dark-mode .book-full-intro h4.book-title {
-  color: #ffffff;
-}
-
-.dark-mode .book-full-intro h4.book-title:hover {
-  opacity: 0.7;
-}
-
-.dark-mode .book-full-intro-text {
-  color: #b0b0b0;
-}
-
-.dark-mode .book-title {
-  color: #ffffff;
-}
-
-.dark-mode .book-title:hover {
-  opacity: 0.7;
-}
-
-.dark-mode .book-author {
-  color: #b0b0b0;
-}
-
-.dark-mode .book-cover {
-  background: #2a2a2a;
-}
-
-.dark-mode .loading {
-  color: #b0b0b0;
-}
-
-.dark-mode .error {
-  color: #ffffff;
-  background: #1a1a1a;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 2px 8px rgba(255,255,255,0.1);
 }
 
 .dark-mode .category-tag.active {
   background: #ffffff;
   color: #000000;
+  border-color: #ffffff;
+  box-shadow: 0 4px 12px rgba(255,255,255,0.2);
 }
 
 .dark-mode .recommend-btn {
@@ -1072,6 +1497,51 @@ onMounted(() => {
 .dark-mode .recommend-btn:focus {
   outline: dashed 2px #ffffff;
   outline-offset: 2px;
+}
+
+.dark-mode .book-card {
+  background: #1a1a1a;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+}
+
+.dark-mode .book-card:hover {
+  box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+}
+
+.dark-mode .book-full-intro {
+  background: rgba(26, 26, 26, 0.95);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+  color: #ffffff;
+}
+
+.dark-mode .book-full-intro h4.book-title {
+  color: #ffffff;
+}
+
+.dark-mode .book-full-intro-text {
+  color: #b0b0b0;
+}
+
+.dark-mode .book-title {
+  color: #ffffff;
+}
+
+.dark-mode .book-author {
+  color: #b0b0b0;
+}
+
+.dark-mode .book-cover {
+  background: #2c2c2c;
+}
+
+.dark-mode .loading {
+  color: #b0b0b0;
+}
+
+.dark-mode .error {
+  color: #ffffff;
+  background: #2c2c2c;
 }
 
 .dark-mode .similarity-value {
@@ -1087,6 +1557,30 @@ onMounted(() => {
 }
 
 .dark-mode .book-intro {
-  color: #e0e0e0;
+  color: #b0b0b0;
+}
+
+.dark-mode .action-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+.dark-mode .like-btn {
+  color: #ff6b6b;
+  border-color: #ff6b6b;
+}
+
+.dark-mode .like-btn:hover {
+  background: rgba(255, 107, 107, 0.2);
+}
+
+.dark-mode .dislike-btn {
+  color: #b0b0b0;
+  border-color: #b0b0b0;
+}
+
+.dark-mode .dislike-btn:hover {
+  background: rgba(176, 176, 176, 0.2);
 }
 </style>
