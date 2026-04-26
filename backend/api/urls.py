@@ -1,5 +1,5 @@
 from django.urls import path
-from api.views import book_rank_api, book_detail_api, admin_login, admin_books, admin_book_detail, user_register, user_login, user_bookshelf, user_bookshelf_remove, book_search, book_recommend, book_recommend_by_book, book_recommend_by_category, book_recommend_by_bookshelf, hot_books, admin_users, admin_user_detail, user_rating, user_rating_detail, book_rating, cache_warmup, cache_clear, book_recommend_you_may_like, post_interests, user_action, user_action_delete, user_actions, get_user_profile, user_profile, user_password, user_avatar
+from api.views import book_rank_api, book_detail_api, admin_login, admin_books, admin_book_detail, user_register, user_login, user_bookshelf, user_bookshelf_remove, book_search, book_recommend, book_recommend_by_book, book_recommend_by_category, book_recommend_by_bookshelf, hot_books, admin_users, admin_user_detail, user_rating, user_rating_detail, book_rating, cache_warmup, cache_clear, book_recommend_you_may_like, post_interests, user_action, user_action_delete, user_actions, get_user_profile, user_profile, user_password, user_avatar, crawler_start, crawler_import, crawler_logs, crawler_stop, check_status
 
 urlpatterns = [
     # 排行榜接口
@@ -52,4 +52,10 @@ urlpatterns = [
     path('user/profile/<int:user_id>/', user_profile),
     path('user/password/<int:user_id>/', user_password),
     path('user/avatar/<int:user_id>/', user_avatar),
+    # 管理员爬虫执行接口
+    path('admin/crawler/start/', crawler_start),
+    path('admin/crawler/import/', crawler_import),
+    path('admin/crawler/logs/', crawler_logs),
+    path('admin/crawler/stop/', crawler_stop),
+    path('admin/check_status/', check_status),
 ]

@@ -6,8 +6,67 @@ from django.views.decorators.csrf import csrf_exempt
 from .cache_utils import CacheManager
 import json
 import os
+import subprocess
+import threading
+import time
 from django.conf import settings
 from django.core.files.storage import default_storage
+
+# Task management variables
+task_processes = {}
+task_logs = {}
+task_status = {}
+
+# Script paths
+SCRIPTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '..', 'scripts')
+CRAWLER_SCRIPT = os.path.join(SCRIPTS_DIR, 'crawler.py')
+IMPORT_SCRIPT = os.path.join(SCRIPTS_DIR, 'import_to_db.py')
+
+# Log file paths
+LOGS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '..', 'logs')
+if not os.path.exists(LOGS_DIR):
+    os.makedirs(LOGS_DIR)
+
+# Simple admin authentication decorator
+def admin_required(func):
+    def wrapper(request, *args, **kwargs):
+        # For simplicity, we'll just check if the request is from admin
+        # In a production environment, you should implement proper authentication
+        if not request.META.get('HTTP_AUTHORIZATION'):
+            return JsonResponse({"code": 401, "msg": "需要管理员权限"}, status=401)
+        return func(request, *args, **kwargs)
+    return wrapper
+
+def capture_process_output(process, task_id):
+    """Capture subprocess output and store it in task_logs"""
+    task_logs[task_id] = []
+    
+    # Read stdout line by line
+    for line in iter(process.stdout.readline, b''):
+        # 明确使用 utf-8 解码，替换无法识别的字符
+        line_str = line.decode('utf-8', errors='replace').strip()
+        # 清理控制字符
+        line_str = ''.join(char for char in line_str if ord(char) >= 32 or char in '\n\t')
+        if line_str:
+            task_logs[task_id].append(line_str)
+            # Limit log size to prevent memory issues
+            if len(task_logs[task_id]) > 1000:
+                task_logs[task_id] = task_logs[task_id][-1000:]
+    
+    # Read stderr
+    for line in iter(process.stderr.readline, b''):
+        # 明确使用 utf-8 解码，替换无法识别的字符
+        line_str = line.decode('utf-8', errors='replace').strip()
+        # 清理控制字符
+        line_str = ''.join(char for char in line_str if ord(char) >= 32 or char in '\n\t')
+        if line_str:
+            task_logs[task_id].append(f"[ERROR] {line_str}")
+            if len(task_logs[task_id]) > 1000:
+                task_logs[task_id] = task_logs[task_id][-1000:]
+    
+    process.wait()
+    task_status[task_id] = 'completed'
+    task_processes.pop(task_id, None)
 
 def book_rank_api(request):
     """
@@ -1253,6 +1312,188 @@ def user_avatar(request, user_id):
             return JsonResponse({"code": 500, "msg": f"服务器错误: {str(e)}"}, status=500)
     
     return JsonResponse({"code": 405, "msg": "请使用 POST 方法上传"}, status=405)
+
+
+@csrf_exempt
+@admin_required
+def crawler_start(request):
+    """
+    启动爬虫脚本接口
+    POST: 接收页码参数，启动爬虫脚本
+    URL: /api/admin/crawler/start/
+    """
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            start_page = data.get('start_page', 81)
+            end_page = data.get('end_page', 101)
+            
+            # Generate task ID
+            task_id = f"crawler_{int(time.time())}"
+            
+            # Check if script exists
+            if not os.path.exists(CRAWLER_SCRIPT):
+                return JsonResponse({"code": 404, "msg": f"爬虫脚本不存在: {CRAWLER_SCRIPT}"}, status=404)
+            
+            # Start subprocess
+            process = subprocess.Popen(
+                ['python', CRAWLER_SCRIPT, str(start_page), str(end_page)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=False
+            )
+            
+            # Store process information
+            task_processes[task_id] = process
+            task_status[task_id] = 'running'
+            
+            # Start thread to capture output
+            threading.Thread(target=capture_process_output, args=(process, task_id), daemon=True).start()
+            
+            return JsonResponse({"code": 200, "msg": "爬虫脚本已启动", "data": {"task_id": task_id}})
+            
+        except Exception as e:
+            return JsonResponse({"code": 500, "msg": f"服务器错误: {str(e)}"}, status=500)
+    else:
+        return JsonResponse({"code": 405, "msg": "只支持POST请求"}, status=405)
+
+
+@csrf_exempt
+@admin_required
+def crawler_import(request):
+    """
+    启动导入脚本接口
+    POST: 启动导入到数据库脚本
+    URL: /api/admin/crawler/import/
+    """
+    if request.method == 'POST':
+        try:
+            # Generate task ID
+            task_id = f"import_{int(time.time())}"
+            
+            # Check if script exists
+            if not os.path.exists(IMPORT_SCRIPT):
+                return JsonResponse({"code": 404, "msg": f"导入脚本不存在: {IMPORT_SCRIPT}"}, status=404)
+            
+            # Start subprocess
+            process = subprocess.Popen(
+                ['python', IMPORT_SCRIPT],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=False
+            )
+            
+            # Store process information
+            task_processes[task_id] = process
+            task_status[task_id] = 'running'
+            
+            # Start thread to capture output
+            threading.Thread(target=capture_process_output, args=(process, task_id), daemon=True).start()
+            
+            return JsonResponse({"code": 200, "msg": "导入脚本已启动", "data": {"task_id": task_id}})
+            
+        except Exception as e:
+            return JsonResponse({"code": 500, "msg": f"服务器错误: {str(e)}"}, status=500)
+    else:
+        return JsonResponse({"code": 405, "msg": "只支持POST请求"}, status=405)
+
+
+@admin_required
+def crawler_logs(request):
+    """
+    获取任务日志接口
+    GET: 获取指定任务的日志
+    URL: /api/admin/crawler/logs/?task_id=xxx
+    """
+    if request.method == 'GET':
+        try:
+            task_id = request.GET.get('task_id')
+            if not task_id:
+                return JsonResponse({"code": 400, "msg": "任务ID不能为空"}, status=400)
+            
+            logs = task_logs.get(task_id, [])
+            status = task_status.get(task_id, 'not_found')
+            
+            return JsonResponse({"code": 200, "msg": "success", "data": {
+                "logs": logs,
+                "status": status
+            }})
+            
+        except Exception as e:
+            return JsonResponse({"code": 500, "msg": f"服务器错误: {str(e)}"}, status=500)
+    else:
+        return JsonResponse({"code": 405, "msg": "只支持GET请求"}, status=405)
+
+
+@csrf_exempt
+@admin_required
+def crawler_stop(request):
+    """
+    停止爬虫任务接口
+    POST: 停止指定的爬虫任务
+    URL: /api/admin/crawler/stop/
+    """
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            task_id = data.get('task_id')
+            
+            if not task_id:
+                return JsonResponse({"code": 400, "msg": "任务ID不能为空"}, status=400)
+            
+            # Kill the process if it exists
+            if task_id in task_processes:
+                process = task_processes[task_id]
+                process.terminate()
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                
+                task_processes.pop(task_id, None)
+                task_status[task_id] = 'stopped'
+                
+                add_log = task_logs.get(task_id, [])
+                add_log.append("任务已被用户停止")
+                task_logs[task_id] = add_log
+                
+                return JsonResponse({"code": 200, "msg": "任务已停止"})
+            else:
+                return JsonResponse({"code": 404, "msg": "任务不存在或已结束"}, status=404)
+            
+        except Exception as e:
+            return JsonResponse({"code": 500, "msg": f"服务器错误: {str(e)}"}, status=500)
+    else:
+        return JsonResponse({"code": 405, "msg": "只支持POST请求"}, status=405)
+
+
+@admin_required
+def check_status(request):
+    """
+    检查任务状态接口
+    GET: 检查是否有正在运行的任务
+    URL: /api/admin/check_status/
+    """
+    if request.method == 'GET':
+        try:
+            running_tasks = []
+            
+            for task_id, process in task_processes.items():
+                task_type = 'crawler' if 'crawler' in task_id else 'import'
+                running_tasks.append({
+                    'task_id': task_id,
+                    'type': task_type,
+                    'status': task_status.get(task_id, 'running')
+                })
+            
+            return JsonResponse({"code": 200, "msg": "success", "data": {
+                "running_tasks": running_tasks
+            }})
+            
+        except Exception as e:
+            return JsonResponse({"code": 500, "msg": f"服务器错误: {str(e)}"}, status=500)
+    else:
+        return JsonResponse({"code": 405, "msg": "只支持GET请求"}, status=405)
 
 
 @csrf_exempt

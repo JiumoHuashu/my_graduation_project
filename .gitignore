@@ -1,4 +1,5 @@
 ﻿node_modules/
+book/
 dist/
 __pycache__/
 *.pth

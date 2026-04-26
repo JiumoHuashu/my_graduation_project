@@ -86,174 +86,222 @@ const handleLogin = async () => {
 
 <style scoped>
 .admin-login {
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  background: #f4f7f9;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
+  letter-spacing: -0.01em;
 }
 
 .login-container {
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.05);
   padding: 40px;
   width: 100%;
   max-width: 400px;
+  transition: all 0.3s ease;
 }
 
 .login-container h1 {
   text-align: center;
-  margin: 0 0 30px 0;
+  margin: 0 0 32px 0;
   font-size: 24px;
-  color: #333;
-  font-weight: bold;
+  font-weight: 600;
+  color: #1a1a1a;
+  letter-spacing: -0.01em;
 }
 
 .form-group {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .form-group label {
   display: block;
   margin-bottom: 8px;
   font-size: 14px;
-  color: #333;
   font-weight: 500;
+  color: #1a1a1a;
+  letter-spacing: -0.01em;
 }
 
 .form-group input {
   width: 100%;
-  padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  padding: 14px 16px;
+  border: none;
+  border-radius: 8px;
   font-size: 14px;
-  transition: 0.2s;
+  background: #f9f9f9;
+  transition: all 0.3s ease;
+  outline: none;
+  letter-spacing: -0.01em;
 }
 
 .form-group input:focus {
-  outline: none;
-  border-color: #409eff;
-  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid #1a1a1a;
 }
 
 .form-actions {
-  margin-top: 30px;
+  margin-top: 32px;
 }
 
 .login-btn {
   width: 100%;
-  background: #409eff;
-  color: white;
+  background: #1a1a1a;
+  color: #ffffff;
   border: none;
   padding: 14px;
-  border-radius: 4px;
+  border-radius: 8px;
   font-size: 16px;
   font-weight: 500;
   cursor: pointer;
-  transition: 0.2s;
+  transition: all 0.3s ease;
+  letter-spacing: 1px;
 }
 
 .login-btn:hover:not(:disabled) {
-  background: #66b1ff;
+  background: #333333;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.login-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
 }
 
 .login-btn:disabled {
-  background: #c0c4cc;
+  background: #e0e0e0;
+  color: #999999;
   cursor: not-allowed;
 }
 
 .error-message {
-  margin-top: 15px;
-  padding: 10px;
-  background: #fef0f0;
-  border: 1px solid #fbc4c4;
-  border-radius: 4px;
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: rgba(245, 108, 108, 0.1);
+  border-radius: 8px;
   color: #f56c6c;
   font-size: 14px;
+  letter-spacing: -0.01em;
+  transition: all 0.3s ease;
 }
 
 .login-tips {
-  margin-top: 30px;
-  padding: 15px;
-  background: #f5f7fa;
-  border-radius: 4px;
+  margin-top: 32px;
+  padding: 16px;
+  background: #ffffff;
+  border: 1px dashed #e0e0e0;
+  border-radius: 8px;
   font-size: 14px;
+  transition: all 0.3s ease;
 }
 
 .login-tips p {
-  margin: 0 0 10px 0;
+  margin: 0 0 12px 0;
   font-weight: 500;
-  color: #333;
+  color: #1a1a1a;
+  letter-spacing: -0.01em;
 }
 
 .login-tips ul {
   margin: 0;
   padding-left: 20px;
-  color: #666;
+  color: #666666;
+  letter-spacing: -0.01em;
 }
 
 .login-tips li {
-  margin-bottom: 5px;
+  margin-bottom: 6px;
 }
 
 /* 响应式设计 */
 @media (max-width: 768px) {
   .login-container {
-    padding: 30px 20px;
+    padding: 32px 24px;
   }
   
   .login-container h1 {
     font-size: 20px;
+    margin-bottom: 24px;
+  }
+  
+  .form-group {
+    margin-bottom: 20px;
+  }
+  
+  .form-actions {
+    margin-top: 24px;
+  }
+  
+  .login-tips {
+    margin-top: 24px;
   }
 }
 
 /* 深色模式样式 */
 .dark-mode .admin-login {
-  background: linear-gradient(135deg, #3a3a3a 0%, #1e1e1e 100%);
+  background: #0a0a0a;
 }
 
 .dark-mode .login-container {
-  background: #1e1e1e;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  background: #141414;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.3);
 }
 
 .dark-mode .login-container h1 {
-  color: #e0e0e0;
+  color: #ffffff;
 }
 
 .dark-mode .form-group label {
-  color: #e0e0e0;
+  color: #ffffff;
 }
 
 .dark-mode .form-group input {
-  background: #3a3a3a;
-  border: 1px solid #4a4a4a;
-  color: #e0e0e0;
+  background: #2d2d2d;
+  color: #ffffff;
 }
 
 .dark-mode .form-group input:focus {
-  border-color: #66b1ff;
-  box-shadow: 0 0 0 2px rgba(102, 177, 255, 0.2);
+  background: #3d3d3d;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+  border: 1px solid #ffffff;
+}
+
+.dark-mode .login-btn {
+  background: #ffffff;
+  color: #0a0a0a;
+}
+
+.dark-mode .login-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.15);
+}
+
+.dark-mode .login-btn:disabled {
+  background: #3d3d3d;
+  color: #666666;
 }
 
 .dark-mode .error-message {
-  background: #3a2a2a;
-  border: 1px solid #5a3a3a;
+  background: rgba(245, 108, 108, 0.2);
   color: #ff6b6b;
 }
 
 .dark-mode .login-tips {
-  background: #2c2c2c;
+  background: #141414;
+  border: 1px dashed #3d3d3d;
 }
 
 .dark-mode .login-tips p {
-  color: #e0e0e0;
+  color: #ffffff;
 }
 
 .dark-mode .login-tips ul {
-  color: #999;
+  color: #999999;
 }
 </style>
