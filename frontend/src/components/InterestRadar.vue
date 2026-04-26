@@ -200,4 +200,56 @@ h2 {
     font-size: 15px;
   }
 }
+
+/* Dark mode */
+.dark-mode .modal-content {
+  background-color: #1a1a1a;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+}
+
+.dark-mode h2 {
+  color: #ffffff;
+}
+
+.dark-mode .subtitle {
+  color: #b0b0b0;
+}
+
+.dark-mode .tag-item {
+  border-color: #333333;
+  color: #ffffff;
+}
+
+.dark-mode .tag-item:hover {
+  border-color: #40a9ff;
+  color: #40a9ff;
+}
+
+.dark-mode .tag-item.active {
+  background-color: #1890ff;
+  color: #ffffff;
+  border-color: #1890ff;
+}
+
+.dark-mode .selected-info {
+  color: #b0b0b0;
+}
+
+.dark-mode .hint {
+  color: #888888;
+}
+
+.dark-mode .confirm-btn {
+  background-color: #1890ff;
+  color: #ffffff;
+}
+
+.dark-mode .confirm-btn:hover:not(:disabled) {
+  background-color: #40a9ff;
+}
+
+.dark-mode .confirm-btn:disabled {
+  background-color: #333333;
+  color: #888888;
+}
 </style>

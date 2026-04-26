@@ -1,22 +1,37 @@
 <template>
   <div class="book-detail">
-    <header class="detail-header">
-      <button class="back-btn" @click="goBack">← 返回</button>
-      <h1>书籍详情</h1>
-    </header>
+    <!-- 悬浮返回按钮 -->
+    <button class="back-btn" @click="goBack" aria-label="返回">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M19 12H5M12 19l-7-7 7-7"/>
+      </svg>
+    </button>
 
     <div v-if="loading" class="loading">数据加载中...</div>
 
     <div v-else-if="error" class="error">{{ error }}</div>
 
     <div v-else-if="book" class="detail-container">
-      <div class="book-info-card">
-        <div class="book-cover-large">
-          <img :src="book.cover_url" @error="handleImgError" alt="封面">
+      <!-- 非对称双栏布局 -->
+      <div class="book-info-layout">
+        <!-- 左侧：封面和操作按钮 -->
+        <div class="book-cover-section">
+          <div class="book-cover-large">
+            <img :src="book.cover_url" @error="handleImgError" alt="封面">
+          </div>
+          <div class="book-actions">
+            <button :class="['add-to-bookshelf-btn', { 'in-bookshelf': isInBookshelf }]" @click="addToBookshelf">
+              {{ isInBookshelf ? '已在书架' : '加入书架' }}
+            </button>
+            <button class="read-btn" @click="visitOriginalPage">
+              立即阅读
+            </button>
+          </div>
         </div>
 
+        <!-- 右侧：书籍详细信息 -->
         <div class="book-info-main">
-          <h2 class="book-title">{{ book.title }}</h2>
+          <h1 class="book-title">{{ book.title }}</h1>
           <div class="book-meta">
             <span class="author">{{ book.author || '未知作者' }}</span>
             <span class="category">{{ book.category }} / {{ book.sub_category }}</span>
@@ -26,22 +41,23 @@
             <span v-for="tag in (book.tags ? book.tags.split('|') : [])" :key="tag" class="tag">{{ tag }}</span>
           </div>
 
+          <!-- 极简网格指标卡片 -->
           <div class="book-stats">
-            <div class="stat-item">
-              <span class="stat-label">总阅读量</span>
+            <div class="stat-card">
               <span class="stat-value">{{ formatNumber(book.total_read) }}</span>
+              <span class="stat-label">总阅读量</span>
             </div>
-            <div class="stat-item">
-              <span class="stat-label">月阅读量</span>
+            <div class="stat-card">
               <span class="stat-value">{{ formatNumber(book.monthly_read) }}</span>
+              <span class="stat-label">月阅读量</span>
             </div>
-            <div class="stat-item">
-              <span class="stat-label">总鲜花</span>
+            <div class="stat-card">
               <span class="stat-value">{{ formatNumber(book.total_flowers) }}</span>
+              <span class="stat-label">总鲜花</span>
             </div>
-            <div class="stat-item">
-              <span class="stat-label">月鲜花</span>
+            <div class="stat-card">
               <span class="stat-value">{{ formatNumber(book.monthly_flowers) }}</span>
+              <span class="stat-label">月鲜花</span>
             </div>
           </div>
 
@@ -60,16 +76,15 @@
             </div>
           </div>
 
+          <!-- 评分区域 -->
           <div class="book-rating">
             <h3>书籍评分</h3>
             <div class="rating-container">
               <div class="average-rating">
-                <div class="rating-label">平均评分</div>
                 <div class="rating-value">{{ bookRating }}分</div>
-                <div class="rating-count">({{ ratingCount }}人评分)</div>
+                <div class="rating-count">{{ ratingCount }}人评分</div>
               </div>
               <div class="user-rating">
-                <div class="rating-label">我的评分</div>
                 <StarRating
                   v-model:rating="userRating"
                   @ratingChange="handleRatingChange"
@@ -86,32 +101,29 @@
             </div>
           </div>
 
-          <div class="book-actions">
-            <button :class="['add-to-bookshelf-btn', { 'in-bookshelf': isInBookshelf }]" @click="addToBookshelf">
-              {{ isInBookshelf ? '已在书架' : '加入书架' }}
-            </button>
+          <!-- 收藏和不感兴趣按钮 -->
+          <div class="book-interactions">
             <button class="action-btn like-btn" :class="{ 'liked': isLiked }" @click="handleUserAction('like')">
               <span class="action-icon">❤️</span>
+              <span class="action-text">{{ isLiked ? '已收藏' : '收藏' }}</span>
             </button>
-            <div class="original-page-container">
-              <button class="original-btn" @click="visitOriginalPage">
-                访问原网页
-              </button>
-              <button class="action-btn dislike-btn small" @click="handleUserAction('dislike')">
-                <span class="action-icon">✕</span>
-              </button>
-            </div>
+            <button class="action-btn dislike-btn" @click="handleUserAction('dislike')">
+              <span class="action-icon">✕</span>
+              <span class="action-text">不感兴趣</span>
+            </button>
           </div>
         </div>
       </div>
 
+      <!-- 内容简介 -->
       <div class="book-introduction">
         <h3>内容简介</h3>
         <p>{{ book.introduction || '暂无简介' }}</p>
       </div>
 
+      <!-- 数据统计和图表 -->
       <div class="data-visualization">
-        <h3>数据统计</h3>
+        <h3>阅读倾向与数据统计</h3>
         <div class="chart-container">
           <div class="chart-item">
             <div class="chart-title">阅读量对比</div>
@@ -505,50 +517,49 @@ watch(() => props.bookId, (newId) => {
 </script>
 
 <style scoped>
-.book-detail {
+:global(body) {
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+}
+
+.book-detail {
   background: #ffffff;
   min-height: 100vh;
   padding-bottom: 48px;
+  position: relative;
 }
 
-.detail-header {
-  background: #ffffff;
-  padding: 16px 24px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+/* 悬浮返回按钮 */
+.back-btn {
+  position: fixed;
+  top: 24px;
+  left: 24px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #333333;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 12px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
-  gap: 16px;
-}
-
-.back-btn {
-  background: #000000;
-  color: #ffffff;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 50px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 400;
-  letter-spacing: -0.14px;
-  transition: opacity 0.2s;
+  justify-content: center;
 }
 
 .back-btn:hover {
-  opacity: 0.85;
+  background: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
 }
 
 .back-btn:focus {
-  outline: dashed 2px #000000;
+  outline: dashed 2px #333333;
   outline-offset: 2px;
-}
-
-.detail-header h1 {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 540;
-  letter-spacing: -0.26px;
-  color: #000000;
 }
 
 .loading, .error {
@@ -560,109 +571,201 @@ watch(() => props.bookId, (newId) => {
 }
 
 .error {
-  color: #000000;
+  color: #333333;
 }
 
 .detail-container {
-  max-width: 1000px;
-  margin: 24px auto;
-  padding: 0 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 48px 24px;
 }
 
-.book-info-card {
-  background: #ffffff;
-  border-radius: 8px;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  padding: 32px;
-  margin-bottom: 24px;
+/* 非对称双栏布局 */
+.book-info-layout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 48px;
+  margin-bottom: 48px;
+  align-items: start;
+}
+
+/* 左侧：封面和操作按钮 */
+.book-cover-section {
   display: flex;
-  gap: 32px;
+  flex-direction: column;
+  gap: 24px;
+  position: sticky;
+  top: 100px;
+}
+
+/* 封面美化 */
+.book-cover-large {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3/4;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+}
+
+.book-cover-large:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15), 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .book-cover-large img {
-  width: 200px;
-  height: 280px;
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  height: 100%;
   object-fit: cover;
+  display: block;
 }
 
+/* 操作按钮 */
+.book-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.add-to-bookshelf-btn, .read-btn {
+  padding: 16px 24px;
+  border: none;
+  border-radius: 50px;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.add-to-bookshelf-btn {
+  background: #000000;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.add-to-bookshelf-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+.add-to-bookshelf-btn.in-bookshelf {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.read-btn {
+  background: transparent;
+  color: #333333;
+  border: 1px solid #e0e0e0;
+  font-weight: 500;
+}
+
+.read-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* 右侧：书籍详细信息 */
 .book-info-main {
-  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
 .book-title {
-  font-size: 28px;
-  color: #000000;
-  margin: 0 0 16px 0;
-  font-weight: 540;
-  letter-spacing: -0.26px;
-  line-height: 1.20;
+  font-size: 32px;
+  color: #333333;
+  margin: 0;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
 .book-meta {
   display: flex;
   gap: 24px;
-  margin-bottom: 16px;
   font-size: 16px;
-  font-weight: 330;
-  letter-spacing: -0.14px;
+  font-weight: 320;
+  letter-spacing: -0.01em;
   color: #666666;
 }
 
+/* 标签优化 */
 .book-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 24px;
 }
 
 .tag {
-  background: rgba(0, 0, 0, 0.06);
-  padding: 6px 16px;
-  border-radius: 50px;
+  background: #f9f9f9;
+  padding: 6px 14px;
+  border-radius: 4px;
   font-size: 13px;
   font-weight: 400;
-  letter-spacing: -0.14px;
-  color: #000000;
+  letter-spacing: -0.01em;
+  color: #333333;
+  border: 1px solid #e0e0e0;
+  transition: all 0.3s ease;
 }
 
+.tag:hover {
+  background: #f0f0f0;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* 极简网格指标卡片 */
 .book-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
-  margin-bottom: 24px;
-  padding: 24px;
-  background: #fafafa;
-  border-radius: 8px;
+  margin-bottom: 8px;
 }
 
-.stat-item {
+.stat-card {
+  background: #f9f9f9;
+  padding: 20px;
+  border-radius: 12px;
   text-align: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.stat-value {
+  display: block;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #333333;
+  margin-bottom: 8px;
 }
 
 .stat-label {
   display: block;
   font-size: 13px;
   color: #666666;
-  margin-bottom: 6px;
   font-weight: 320;
-  letter-spacing: -0.1px;
-}
-
-.stat-value {
-  display: block;
-  font-size: 20px;
-  font-weight: 540;
-  letter-spacing: -0.14px;
-  color: #000000;
+  letter-spacing: -0.01em;
 }
 
 .book-info-secondary {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 24px;
+  margin-bottom: 8px;
 }
 
 .info-item {
@@ -675,31 +778,37 @@ watch(() => props.bookId, (newId) => {
   font-size: 13px;
   color: #666666;
   font-weight: 320;
-  letter-spacing: -0.1px;
+  letter-spacing: -0.01em;
 }
 
 .info-value {
   font-size: 16px;
-  color: #000000;
+  color: #333333;
   font-weight: 400;
-  letter-spacing: -0.14px;
+  letter-spacing: -0.01em;
 }
 
+/* 评分区域 */
 .book-rating {
-  margin: 24px 0;
+  background: rgba(249, 249, 249, 0.8);
+  backdrop-filter: blur(12px);
   padding: 24px;
-  background: #fafafa;
-  border-radius: 8px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.book-rating:hover {
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
 }
 
 .book-rating h3 {
   font-size: 18px;
-  color: #000000;
-  margin: 0 0 16px 0;
-  font-weight: 540;
-  letter-spacing: -0.14px;
-  padding-left: 12px;
-  border-left: 2px solid #000000;
+  color: #333333;
+  margin: 0 0 20px 0;
+  font-weight: 500;
+  letter-spacing: -0.01em;
 }
 
 .rating-container {
@@ -713,24 +822,16 @@ watch(() => props.bookId, (newId) => {
   text-align: center;
 }
 
-.average-rating .rating-label {
-  font-size: 14px;
-  color: #666666;
-  margin-bottom: 12px;
-  font-weight: 320;
-  letter-spacing: -0.1px;
-}
-
 .average-rating .rating-value {
-  font-size: 36px;
-  font-weight: 540;
-  letter-spacing: -0.26px;
-  color: #000000;
-  margin-bottom: 6px;
+  font-size: 48px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #333333;
+  margin-bottom: 8px;
 }
 
 .average-rating .rating-count {
-  font-size: 13px;
+  font-size: 14px;
   color: #666666;
   font-weight: 320;
 }
@@ -739,87 +840,73 @@ watch(() => props.bookId, (newId) => {
   flex: 2;
 }
 
-.user-rating .rating-label {
-  font-size: 14px;
-  color: #666666;
-  margin-bottom: 12px;
-  font-weight: 320;
-  letter-spacing: -0.1px;
-}
-
 .submit-rating-btn {
   margin-top: 16px;
   background: #000000;
   color: #ffffff;
   border: none;
-  padding: 10px 24px;
+  padding: 12px 24px;
   border-radius: 50px;
   cursor: pointer;
   font-size: 14px;
-  font-weight: 400;
-  letter-spacing: -0.14px;
-  transition: opacity 0.2s;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  transition: all 0.3s ease;
 }
 
 .submit-rating-btn:hover:not(:disabled) {
-  opacity: 0.85;
-}
-
-.submit-rating-btn:focus {
-  outline: dashed 2px #000000;
-  outline-offset: 2px;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .submit-rating-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .rating-error {
   margin-top: 12px;
   font-size: 13px;
-  color: #000000;
+  color: #333333;
   font-weight: 400;
 }
 
-.book-actions {
+/* 收藏和不感兴趣按钮 */
+.book-interactions {
   display: flex;
-  gap: 12px;
-  margin-top: 24px;
-  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 8px;
 }
 
-.add-to-bookshelf-btn, .action-btn, .original-btn {
+.action-btn {
   flex: 1;
-  min-width: 120px;
   padding: 14px 24px;
-  border: none;
+  border: 1px solid #e0e0e0;
   border-radius: 50px;
   font-size: 16px;
   font-weight: 400;
-  letter-spacing: -0.14px;
+  letter-spacing: -0.01em;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: all 0.3s ease;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-}
-
-.action-btn {
-  border: 1px solid #000000;
+  background: #ffffff;
+  color: #333333;
 }
 
 .like-btn {
-  background: #ffffff;
-  color: #000000;
   border-color: #ff6b6b;
-  transition: all 0.3s ease;
+  color: #ff6b6b;
 }
 
 .like-btn:hover {
   background: rgba(255, 107, 107, 0.1);
-  transform: scale(1.1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.2);
 }
 
 .like-btn.liked {
@@ -829,160 +916,78 @@ watch(() => props.bookId, (newId) => {
   animation: pulse 0.5s ease;
 }
 
-@keyframes pulse {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.2);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
 .dislike-btn {
-  background: #ffffff;
-  color: #000000;
   border-color: #666666;
-  transition: all 0.3s ease;
+  color: #666666;
 }
 
 .dislike-btn:hover {
   background: rgba(102, 102, 102, 0.1);
-  transform: scale(1.1);
-}
-
-.dislike-btn.small {
-  font-size: 12px;
-  padding: 6px 12px;
-  min-width: auto;
-  flex: none;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 102, 102, 0.2);
 }
 
 .action-icon {
+  font-size: 16px;
+}
+
+.action-text {
   font-size: 14px;
+  font-weight: 500;
 }
 
-.original-page-container {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  position: relative;
-}
-
-.original-btn {
-  flex: 1;
-  min-width: 140px;
-  padding: 14px 24px;
-  background: #ffffff;
-  color: #000000;
-  border: 1px solid #000000;
-  border-radius: 50px;
-  font-size: 16px;
-  font-weight: 400;
-  letter-spacing: -0.14px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.original-btn:hover {
-  background: rgba(0, 0, 0, 0.04);
-}
-
-.original-btn:focus {
-  outline: dashed 2px #000000;
-  outline-offset: 2px;
-}
-
-.add-to-bookshelf-btn {
-  background: #000000;
-  color: #ffffff;
-}
-
-.add-to-bookshelf-btn:hover {
-  opacity: 0.85;
-}
-
-.add-to-bookshelf-btn:focus {
-  outline: dashed 2px #000000;
-  outline-offset: 2px;
-}
-
-.add-to-bookshelf-btn.in-bookshelf {
-  background: rgba(0, 0, 0, 0.3);
-}
-
-.add-to-bookshelf-btn.in-bookshelf:hover {
-  opacity: 0.85;
-}
-
-.original-btn {
-  background: #ffffff;
-  color: #000000;
-  border: 1px solid #000000;
-  padding: 14px 24px;
-  border-radius: 50px;
-  font-size: 16px;
-  font-weight: 400;
-  letter-spacing: -0.14px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.original-btn:hover {
-  background: rgba(0, 0, 0, 0.04);
-}
-
-.original-btn:focus {
-  outline: dashed 2px #000000;
-  outline-offset: 2px;
-}
-
+/* 内容简介 */
 .book-introduction {
   background: #ffffff;
-  border-radius: 8px;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  padding: 24px;
-  margin-bottom: 24px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  padding: 32px;
+  margin-bottom: 32px;
+  transition: all 0.3s ease;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.book-introduction:hover {
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
 }
 
 .book-introduction h3 {
-  font-size: 18px;
-  color: #000000;
+  font-size: 20px;
+  color: #333333;
   margin: 0 0 16px 0;
-  font-weight: 540;
-  letter-spacing: -0.14px;
-  padding-left: 12px;
-  border-left: 2px solid #000000;
+  font-weight: 500;
+  letter-spacing: -0.01em;
 }
 
 .book-introduction p {
   font-size: 16px;
-  line-height: 1.60;
+  line-height: 1.6;
   color: #666666;
   margin: 0;
-  font-weight: 330;
-  letter-spacing: -0.1px;
+  font-weight: 320;
+  letter-spacing: -0.01em;
 }
 
+/* 数据统计和图表 */
 .data-visualization {
   background: #ffffff;
-  border-radius: 8px;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  padding: 32px;
+  transition: all 0.3s ease;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.data-visualization:hover {
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
 }
 
 .data-visualization h3 {
-  font-size: 18px;
-  color: #000000;
+  font-size: 20px;
+  color: #333333;
   margin: 0 0 24px 0;
-  font-weight: 540;
-  letter-spacing: -0.14px;
-  padding-left: 12px;
-  border-left: 2px solid #000000;
+  font-weight: 500;
+  letter-spacing: -0.01em;
 }
 
 .chart-container {
@@ -992,33 +997,41 @@ watch(() => props.bookId, (newId) => {
 }
 
 .chart-item {
-  background: #fafafa;
-  padding: 20px;
-  border-radius: 8px;
+  background: #f9f9f9;
+  padding: 24px;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.chart-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
 .chart-title {
-  font-size: 14px;
-  font-weight: 540;
-  letter-spacing: -0.14px;
-  color: #000000;
-  margin-bottom: 16px;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: #333333;
+  margin-bottom: 20px;
   text-align: center;
 }
 
 .chart-bar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: 16px;
+  margin-bottom: 16px;
 }
 
 .bar-label {
-  width: 60px;
+  width: 80px;
   font-size: 13px;
   color: #666666;
   font-weight: 320;
-  letter-spacing: -0.1px;
+  letter-spacing: -0.01em;
 }
 
 .bar-container {
@@ -1031,17 +1044,17 @@ watch(() => props.bookId, (newId) => {
 
 .bar {
   height: 100%;
-  background: #000000;
+  background: #404040;
   border-radius: 4px;
   transition: width 0.5s ease;
 }
 
 .bar.secondary {
-  background: #666666;
+  background: #4a6fa5;
 }
 
 .bar.tertiary {
-  background: #999999;
+  background: #5c8599;
 }
 
 .chart-item.full-width {
@@ -1049,47 +1062,102 @@ watch(() => props.bookId, (newId) => {
 }
 
 .bar-value {
-  width: 80px;
-  font-size: 12px;
+  width: 100px;
+  font-size: 13px;
   color: #666666;
   text-align: right;
-  font-weight: 320;
-  letter-spacing: -0.1px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
 }
 
-@media (max-width: 768px) {
-  .book-info-card {
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
+/* 响应式设计 */
+@media (max-width: 992px) {
+  .book-info-layout {
+    grid-template-columns: 1fr;
+    gap: 32px;
   }
-
+  
+  .book-cover-section {
+    position: static;
+  }
+  
+  .book-cover-large {
+    max-width: 250px;
+    margin: 0 auto;
+  }
+  
   .book-stats {
     grid-template-columns: repeat(2, 1fr);
   }
-
+  
   .book-info-secondary {
     grid-template-columns: 1fr;
     gap: 16px;
   }
-
+  
+  .rating-container {
+    flex-direction: column;
+    gap: 24px;
+  }
+  
   .chart-container {
     grid-template-columns: 1fr;
   }
 }
 
+@media (max-width: 768px) {
+  .detail-container {
+    padding: 32px 16px;
+  }
+  
+  .book-title {
+    font-size: 28px;
+  }
+  
+  .book-meta {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .book-actions {
+    flex-direction: row;
+  }
+  
+  .add-to-bookshelf-btn, .read-btn {
+    flex: 1;
+  }
+  
+  .book-interactions {
+    flex-direction: column;
+  }
+  
+  .book-introduction,
+  .data-visualization {
+    padding: 24px;
+  }
+}
+
+/* 暗色模式 */
 .dark-mode .book-detail {
-  background: #000000 !important;
+  background: #121212 !important;
   color: #ffffff !important;
 }
 
-.dark-mode .detail-header {
-  background: #000000;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+.dark-mode .back-btn {
+  background: rgba(26, 26, 26, 0.9);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-.dark-mode .detail-header h1 {
-  color: #ffffff;
+.dark-mode .back-btn:hover {
+  background: rgba(30, 30, 30, 0.9);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+.dark-mode .back-btn:focus {
+  outline: dashed 2px #ffffff;
+  outline-offset: 2px;
 }
 
 .dark-mode .loading {
@@ -1100,10 +1168,12 @@ watch(() => props.bookId, (newId) => {
   color: #ffffff;
 }
 
-.dark-mode .book-info-card {
-  background: #0a0a0a;
-  box-shadow: none;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+.dark-mode .book-cover-large {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.dark-mode .book-cover-large:hover {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .dark-mode .book-title {
@@ -1117,18 +1187,30 @@ watch(() => props.bookId, (newId) => {
 .dark-mode .tag {
   background: rgba(255, 255, 255, 0.08);
   color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.dark-mode .book-stats {
-  background: #1a1a1a;
+.dark-mode .tag:hover {
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-.dark-mode .stat-label {
-  color: #b0b0b0;
+.dark-mode .stat-card {
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.dark-mode .stat-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
 .dark-mode .stat-value {
   color: #ffffff;
+}
+
+.dark-mode .stat-label {
+  color: #b0b0b0;
 }
 
 .dark-mode .info-label {
@@ -1139,15 +1221,103 @@ watch(() => props.bookId, (newId) => {
   color: #ffffff;
 }
 
+.dark-mode .book-rating {
+  background: rgba(26, 26, 26, 0.8);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.dark-mode .book-rating:hover {
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+}
+
+.dark-mode .book-rating h3 {
+  color: #ffffff;
+}
+
+.dark-mode .average-rating .rating-value {
+  color: #ffffff;
+}
+
+.dark-mode .average-rating .rating-count {
+  color: #b0b0b0;
+}
+
+.dark-mode .rating-error {
+  color: #ffffff;
+}
+
+.dark-mode .action-btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dark-mode .like-btn {
+  border-color: #ff6b6b;
+  color: #ff6b6b;
+}
+
+.dark-mode .like-btn:hover {
+  background: rgba(255, 107, 107, 0.2);
+  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+}
+
+.dark-mode .dislike-btn {
+  border-color: #b0b0b0;
+  color: #b0b0b0;
+}
+
+.dark-mode .dislike-btn:hover {
+  background: rgba(176, 176, 176, 0.2);
+  box-shadow: 0 4px 12px rgba(176, 176, 176, 0.3);
+}
+
+.dark-mode .add-to-bookshelf-btn {
+  background: #ffffff;
+  color: #000000;
+}
+
+.dark-mode .add-to-bookshelf-btn:hover {
+  box-shadow: 0 6px 20px rgba(255, 255, 255, 0.2);
+}
+
+.dark-mode .add-to-bookshelf-btn.in-bookshelf {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.dark-mode .read-btn {
+  background: transparent;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dark-mode .read-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.15);
+}
+
+.dark-mode .submit-rating-btn {
+  background: #ffffff;
+  color: #000000;
+}
+
+.dark-mode .submit-rating-btn:hover:not(:disabled) {
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
+}
+
 .dark-mode .book-introduction {
-  background: #0a0a0a;
-  box-shadow: none;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(26, 26, 26, 0.8);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.dark-mode .book-introduction:hover {
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
 }
 
 .dark-mode .book-introduction h3 {
   color: #ffffff;
-  border-left-color: #ffffff;
 }
 
 .dark-mode .book-introduction p {
@@ -1155,18 +1325,27 @@ watch(() => props.bookId, (newId) => {
 }
 
 .dark-mode .data-visualization {
-  background: #0a0a0a;
-  box-shadow: none;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(26, 26, 26, 0.8);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.dark-mode .data-visualization:hover {
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
 }
 
 .dark-mode .data-visualization h3 {
   color: #ffffff;
-  border-left-color: #ffffff;
 }
 
 .dark-mode .chart-item {
-  background: #1a1a1a;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.dark-mode .chart-item:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
 .dark-mode .chart-title {
@@ -1178,86 +1357,35 @@ watch(() => props.bookId, (newId) => {
 }
 
 .dark-mode .bar-container {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.dark-mode .bar {
+  background: #666666;
+}
+
+.dark-mode .bar.secondary {
+  background: #6a8eba;
+}
+
+.dark-mode .bar.tertiary {
+  background: #7ca2b8;
 }
 
 .dark-mode .bar-value {
   color: #b0b0b0;
 }
 
-.dark-mode .book-rating {
-  background: #1a1a1a;
-}
-
-.dark-mode .book-rating h3 {
-  color: #ffffff;
-  border-left-color: #ffffff;
-}
-
-.dark-mode .average-rating .rating-label {
-  color: #b0b0b0;
-}
-
-.dark-mode .average-rating .rating-value {
-  color: #ffffff;
-}
-
-.dark-mode .average-rating .rating-count {
-  color: #b0b0b0;
-}
-
-.dark-mode .user-rating .rating-label {
-  color: #b0b0b0;
-}
-
-.dark-mode .rating-error {
-  color: #ffffff;
-}
-
-.dark-mode .back-btn {
-  background: #ffffff;
-  color: #000000;
-}
-
-.dark-mode .back-btn:hover {
-  opacity: 0.85;
-}
-
-.dark-mode .back-btn:focus {
-  outline: dashed 2px #ffffff;
-  outline-offset: 2px;
-}
-
-.dark-mode .add-to-bookshelf-btn {
-  background: #ffffff;
-  color: #000000;
-}
-
-.dark-mode .add-to-bookshelf-btn:hover {
-  opacity: 0.85;
-}
-
-.dark-mode .add-to-bookshelf-btn.in-bookshelf {
-  background: rgba(255, 255, 255, 0.3);
-}
-
-.dark-mode .add-to-bookshelf-btn:focus {
-  outline: dashed 2px #ffffff;
-  outline-offset: 2px;
-}
-
-.dark-mode .original-btn {
-  background: #000000;
-  color: #ffffff;
-  border: 1px solid #ffffff;
-}
-
-.dark-mode .original-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.dark-mode .original-btn:focus {
-  outline: dashed 2px #ffffff;
-  outline-offset: 2px;
+/* 动画效果 */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 </style>

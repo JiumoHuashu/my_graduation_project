@@ -93,171 +93,227 @@ onMounted(() => fetchBooks('全部'))
 
 <style scoped>
 .rank-page {
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
   background: #f5f7f9;
   min-height: 100vh;
+  letter-spacing: -0.01em;
 }
 
 .rank-header {
   background: #fff;
   text-align: center;
-  padding: 20px;
-  border-bottom: 1px solid #ddd;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  padding: 24px;
+  box-shadow: 0 4px 30px rgba(0,0,0,0.03);
 }
 
 .rank-header h1 {
-  margin: 0 0 5px 0;
-  font-size: 24px;
-  color: #333;
+  margin: 0 0 8px 0;
+  font-size: 28px;
+  font-weight: 600;
+  color: #000000;
+  letter-spacing: -0.01em;
 }
 
 .rank-header p {
   margin: 0;
   font-size: 14px;
-  color: #666;
+  color: #666666;
+  letter-spacing: -0.01em;
 }
 
 .container {
   display: flex;
   max-width: 1100px;
-  margin: 20px auto;
-  gap: 20px;
-  padding: 0 20px;
+  margin: 24px auto;
+  gap: 24px;
+  padding: 0 24px;
 }
 
+/* 侧边栏升级 */
 .sidebar {
-  width: 180px;
-  background: #fff;
+  width: 200px;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   height: fit-content;
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  box-shadow: 0 4px 30px rgba(0,0,0,0.05);
+  transition: all 0.3s ease;
 }
 
 .nav-item {
-  padding: 15px 20px;
+  padding: 16px 20px;
   cursor: pointer;
-  transition: 0.2s;
+  transition: all 0.3s ease;
   border-left: 4px solid transparent;
+  position: relative;
 }
 
 .nav-item:hover {
-  background: #f0f7ff;
-  color: #409eff;
+  background: rgba(0, 0, 0, 0.04);
+  transform: translateX(4px);
 }
 
 .nav-item.active {
-  background: #ecf5ff;
-  color: #409eff;
-  border-left-color: #409eff;
-  font-weight: bold;
+  background: #000000;
+  color: #ffffff;
+  border-left-color: #000000;
+  font-weight: 600;
 }
 
 .main-list {
   flex: 1;
-  background: #fff;
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 4px 30px rgba(0,0,0,0.05);
 }
 
+/* 榜单列表优化 */
 .book-item {
   display: flex;
-  padding: 20px 0;
-  border-bottom: 1px solid #eee;
+  padding: 24px 0;
+  border-bottom: 1px solid #f0f0f0;
   position: relative;
   cursor: pointer;
-  transition: 0.2s;
+  transition: all 0.3s ease;
 }
 
 .book-item:hover {
-  background: #f9f9f9;
+  transform: translateY(-4px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.08);
 }
 
+/* 强化名次展示 */
 .rank-badge {
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  background: #999;
-  color: #fff;
+  background: #999999;
+  color: #ffffff;
   text-align: center;
-  line-height: 30px;
-  margin-right: 15px;
-  font-weight: bold;
+  line-height: 36px;
+  margin-right: 20px;
+  font-weight: 600;
+  font-size: 16px;
+  transition: all 0.3s ease;
 }
 
+.rank-badge:hover {
+  transform: scale(1.1);
+}
+
+/* 前三名使用金/银/铜渐变背景 */
 .top-1 {
-  background: #ff4500;
+  background: linear-gradient(135deg, #FFD700, #FFA500);
+  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.4);
 }
 
 .top-2 {
-  background: #ff8c00;
+  background: linear-gradient(135deg, #C0C0C0, #E8E8E8);
+  box-shadow: 0 4px 12px rgba(192, 192, 192, 0.4);
 }
 
 .top-3 {
-  background: #ffd700;
+  background: linear-gradient(135deg, #CD7F32, #F4A460);
+  box-shadow: 0 4px 12px rgba(205, 127, 50, 0.4);
+}
+
+/* 封面比例保护 */
+.book-cover {
+  width: 100px;
+  aspect-ratio: 3/4;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+  transition: all 0.3s ease;
 }
 
 .book-cover img {
-  width: 100px;
-  height: 130px;
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  width: 100%;
+  height: 100%;
   object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.book-item:hover .book-cover img {
+  transform: scale(1.05);
 }
 
 .book-info {
   flex: 1;
-  margin-left: 20px;
+  margin-left: 24px;
 }
 
 .book-title {
-  margin: 0 0 10px 0;
-  font-size: 18px;
-  color: #333;
+  margin: 0 0 12px 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #000000;
+  letter-spacing: -0.01em;
 }
 
 .book-meta {
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   font-size: 13px;
-  color: #666;
+  color: #666666;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .tag {
-  background: #f0f2f5;
-  padding: 2px 8px;
+  background: #f5f5f5;
+  padding: 4px 12px;
   border-radius: 4px;
-  margin-left: 8px;
+  font-size: 12px;
+  color: #666666;
+  transition: all 0.3s ease;
 }
 
+/* 简介文本优化 */
 .book-intro {
-  font-size: 13px;
-  color: #999;
+  font-size: 14px;
+  color: #999999;
   line-height: 1.6;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
+  letter-spacing: -0.01em;
 }
 
+/* 统计与交互 */
 .book-stats {
-  font-size: 14px;
-  font-weight: bold;
-  color: #ff4500;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-size: 13px;
+  color: #666666;
+}
+
+.hot-value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  color: #000000;
 }
 
 .word-count {
-  color: #666;
-  margin-left: 15px;
-  font-weight: normal;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #666666;
 }
 
 .loading {
   text-align: center;
-  padding: 50px 0;
-  color: #666;
+  padding: 60px 0;
+  color: #666666;
+  font-size: 14px;
 }
 
 /* 响应式设计 */
@@ -268,19 +324,19 @@ onMounted(() => fetchBooks('全部'))
   
   .sidebar {
     width: 100%;
-    margin-bottom: 20px;
+    margin-bottom: 24px;
   }
   
   .nav-item {
     display: inline-block;
     border-left: none;
     border-bottom: 4px solid transparent;
-    padding: 10px 15px;
+    padding: 12px 16px;
   }
   
   .nav-item.active {
     border-left: none;
-    border-bottom-color: #409eff;
+    border-bottom-color: #000000;
   }
   
   .book-item {
@@ -291,95 +347,119 @@ onMounted(() => fetchBooks('全部'))
   
   .rank-badge {
     position: absolute;
-    top: 10px;
-    left: 10px;
+    top: 12px;
+    left: 12px;
   }
   
   .book-info {
     margin-left: 0;
-    margin-top: 10px;
+    margin-top: 16px;
+  }
+  
+  .book-stats {
+    justify-content: center;
   }
 }
 
 /* 深色模式样式 */
 .dark-mode .rank-page {
-  background: #121212 !important;
-  color: #e0e0e0 !important;
+  background: #0a0a0a !important;
+  color: #ffffff !important;
 }
 
 .dark-mode .rank-header {
-  background: #1e1e1e;
-  border-bottom: 1px solid #3a3a3a;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  background: rgba(26, 26, 26, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 4px 30px rgba(0,0,0,0.3);
 }
 
 .dark-mode .rank-header h1 {
-  color: #e0e0e0;
+  color: #ffffff;
 }
 
 .dark-mode .rank-header p {
-  color: #999;
+  color: #b0b0b0;
 }
 
 .dark-mode .sidebar {
-  background: #1e1e1e;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  background: rgba(26, 26, 26, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 4px 30px rgba(0,0,0,0.3);
 }
 
 .dark-mode .nav-item {
-  color: #e0e0e0;
+  color: #ffffff;
 }
 
 .dark-mode .nav-item:hover {
-  background: rgba(102, 177, 255, 0.1);
-  color: #66b1ff;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .dark-mode .nav-item.active {
-  background: rgba(102, 177, 255, 0.15);
-  color: #66b1ff;
-  border-left-color: #66b1ff;
+  background: #ffffff;
+  color: #000000;
+  border-left-color: #ffffff;
 }
 
 .dark-mode .main-list {
-  background: #1e1e1e;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  background: rgba(26, 26, 26, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 4px 30px rgba(0,0,0,0.3);
 }
 
 .dark-mode .book-item {
-  border-bottom: 1px solid #3a3a3a;
+  border-bottom: 1px solid #333333;
 }
 
 .dark-mode .book-item:hover {
-  background: rgba(255,255,255,0.05);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
 }
 
 .dark-mode .book-title {
-  color: #e0e0e0;
+  color: #ffffff;
 }
 
 .dark-mode .book-meta {
-  color: #999;
+  color: #b0b0b0;
 }
 
 .dark-mode .tag {
-  background: #3a3a3a;
+  background: #333333;
   color: #b0b0b0;
 }
 
 .dark-mode .book-intro {
-  color: #999;
+  color: #999999;
 }
 
-.dark-mode .book-stats {
-  color: #ff6b6b;
+.dark-mode .hot-value {
+  color: #ffffff;
 }
 
 .dark-mode .word-count {
-  color: #999;
+  color: #b0b0b0;
 }
 
 .dark-mode .loading {
-  color: #999;
+  color: #999999;
+}
+
+/* 深色模式下前三名的金属质感 */
+.dark-mode .top-1 {
+  background: linear-gradient(135deg, #B8860B, #FFD700);
+  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
+}
+
+.dark-mode .top-2 {
+  background: linear-gradient(135deg, #708090, #C0C0C0);
+  box-shadow: 0 4px 12px rgba(192, 192, 192, 0.3);
+}
+
+.dark-mode .top-3 {
+  background: linear-gradient(135deg, #8B4513, #CD7F32);
+  box-shadow: 0 4px 12px rgba(205, 127, 50, 0.3);
 }
 </style>

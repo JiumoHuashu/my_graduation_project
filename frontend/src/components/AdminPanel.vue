@@ -126,6 +126,38 @@
             <h2>数据可视化</h2>
           </div>
 
+          <!-- 统计卡片 -->
+          <div class="stats-cards">
+            <div class="stat-card">
+              <div class="stat-icon">📚</div>
+              <div class="stat-info">
+                <div class="stat-value">{{ books.length }}</div>
+                <div class="stat-label">总书籍数</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">👤</div>
+              <div class="stat-info">
+                <div class="stat-value">{{ users.length }}</div>
+                <div class="stat-label">总用户数</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">📈</div>
+              <div class="stat-info">
+                <div class="stat-value">{{ totalReadCount }}万</div>
+                <div class="stat-label">总阅读量</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">🏆</div>
+              <div class="stat-info">
+                <div class="stat-value">{{ topBookTitle || '暂无' }}</div>
+                <div class="stat-label">热门书籍</div>
+              </div>
+            </div>
+          </div>
+
           <div class="dashboard-content">
             <div class="chart-container">
               <h3>书籍分类分布</h3>
@@ -472,6 +504,18 @@ const filteredUsers = computed(() => {
     user.username.toLowerCase().includes(keyword) || 
     user.email.toLowerCase().includes(keyword)
   )
+})
+
+// 统计数据计算属性
+const totalReadCount = computed(() => {
+  const total = books.value.reduce((sum, book) => sum + (book.read_count || 0), 0)
+  return (total / 10000).toFixed(1)
+})
+
+const topBookTitle = computed(() => {
+  if (books.value.length === 0) return ''
+  const topBook = [...books.value].sort((a, b) => (b.read_count || 0) - (a.read_count || 0))[0]
+  return topBook.title.length > 10 ? topBook.title.substring(0, 10) + '...' : topBook.title
 })
 
 const fetchBooks = async () => {
@@ -985,25 +1029,31 @@ onMounted(() => {
 
 <style scoped>
 .admin-panel {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-  background: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  background: #f8f9fa;
   min-height: 100vh;
+  letter-spacing: -0.01em;
 }
 
 .admin-header {
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   padding: 16px 24px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
 .admin-header h1 {
   margin: 0;
   font-size: 20px;
-  font-weight: 540;
-  letter-spacing: -0.26px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   color: #000000;
 }
 
@@ -1018,20 +1068,22 @@ onMounted(() => {
   color: #ffffff;
   border: none;
   padding: 10px 20px;
-  border-radius: 50px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 14px;
-  font-weight: 400;
-  letter-spacing: -0.14px;
-  transition: opacity 0.2s;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  transition: all 0.3s ease;
 }
 
 .logout-btn:hover {
-  opacity: 0.85;
+  background: rgba(0, 0, 0, 0.85);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .logout-btn:focus {
-  outline: dashed 2px #000000;
+  outline: 2px solid #000000;
   outline-offset: 2px;
 }
 
@@ -1043,23 +1095,26 @@ onMounted(() => {
   padding: 0 24px;
 }
 
+/* 侧边栏与导航 */
 .admin-sidebar {
-  width: 200px;
+  width: 180px;
   background: #ffffff;
   border-radius: 8px;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  padding: 20px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
+  padding: 24px;
   height: fit-content;
   flex-shrink: 0;
+  transition: all 0.3s ease;
+  border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 .admin-sidebar h2 {
-  margin: 0 0 20px 0;
+  margin: 0 0 24px 0;
   font-size: 14px;
   color: #666666;
-  font-weight: 320;
-  letter-spacing: -0.1px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
 }
 
 .admin-sidebar ul {
@@ -1070,34 +1125,40 @@ onMounted(() => {
 
 .admin-sidebar li {
   padding: 12px 16px;
-  border-radius: 50px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: background 0.2s;
-  margin-bottom: 4px;
-  font-size: 16px;
-  font-weight: 400;
-  letter-spacing: -0.14px;
+  transition: all 0.3s ease;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
   color: #000000;
+  position: relative;
+  left: 0;
+  border-left: 4px solid transparent;
 }
 
 .admin-sidebar li:hover {
   background: rgba(0, 0, 0, 0.04);
-  color: #000000;
+  left: 4px;
 }
 
 .admin-sidebar li.active {
   background: rgba(0, 0, 0, 0.08);
-  font-weight: 540;
   color: #000000;
+  font-weight: 600;
+  left: 4px;
+  border-left-color: #000000;
 }
 
+/* 主内容区 */
 .admin-content {
   flex: 1;
   background: #ffffff;
   border-radius: 8px;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
   padding: 24px;
+  transition: all 0.3s ease;
 }
 
 .content-header {
@@ -1111,8 +1172,8 @@ onMounted(() => {
   margin: 0;
   font-size: 18px;
   color: #000000;
-  font-weight: 540;
-  letter-spacing: -0.14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .add-btn {
@@ -1120,20 +1181,22 @@ onMounted(() => {
   color: #ffffff;
   border: none;
   padding: 12px 24px;
-  border-radius: 50px;
+  border-radius: 8px;
   font-size: 14px;
-  font-weight: 400;
-  letter-spacing: -0.14px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: all 0.3s ease;
 }
 
 .add-btn:hover {
-  opacity: 0.85;
+  background: rgba(0, 0, 0, 0.85);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .add-btn:focus {
-  outline: dashed 2px #000000;
+  outline: 2px solid #000000;
   outline-offset: 2px;
 }
 
@@ -1144,21 +1207,26 @@ onMounted(() => {
 .search-bar input {
   width: 100%;
   padding: 12px 16px;
-  border: 1px solid rgba(0, 0, 0, 0.15);
-  border-radius: 50px;
-  font-size: 16px;
-  font-weight: 330;
-  letter-spacing: -0.14px;
-  transition: border-color 0.2s;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  transition: all 0.3s ease;
   outline: none;
 }
 
 .search-bar input:focus {
   border-color: #000000;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
 }
 
+/* 表格系统重构 */
 .books-table {
   overflow-x: auto;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .books-table table {
@@ -1168,23 +1236,25 @@ onMounted(() => {
 
 .books-table th,
 .books-table td {
-  padding: 14px 12px;
+  padding: 16px 12px;
   text-align: left;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .books-table th {
-  background: #fafafa;
-  font-weight: 540;
-  color: #000000;
-  font-size: 14px;
-  letter-spacing: -0.1px;
+  background: #f8f9fa;
+  font-weight: 500;
+  color: #666666;
+  font-size: 12px;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
 }
 
 .books-table tr:hover td {
-  background: #fafafa;
+  background: #f8f9fa;
 }
 
+/* 操作按钮 */
 .edit-btn,
 .delete-btn {
   padding: 8px 16px;
@@ -1218,29 +1288,35 @@ onMounted(() => {
 
 .empty-state {
   text-align: center;
-  padding: 60px 20px;
+  padding: 80px 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin-top: 24px;
 }
 
 .empty-icon {
   font-size: 64px;
   margin-bottom: 20px;
+  opacity: 0.5;
 }
 
 .empty-state h3 {
   margin: 0 0 10px 0;
   font-size: 18px;
   color: #000000;
-  font-weight: 540;
-  letter-spacing: -0.14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .empty-state p {
   margin: 0;
   font-size: 14px;
   color: #666666;
-  font-weight: 320;
+  font-weight: 400;
+  letter-spacing: -0.01em;
 }
 
+/* 弹窗与表单 */
 .modal {
   position: fixed;
   top: 0;
@@ -1260,6 +1336,8 @@ onMounted(() => {
   width: 100%;
   height: 100%;
   background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .modal-content {
@@ -1269,9 +1347,21 @@ onMounted(() => {
   max-width: 800px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
   position: relative;
   z-index: 1;
+  animation: modalFadeIn 0.3s ease;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .modal-header {
@@ -1279,23 +1369,23 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .modal-header h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: 18px;
   color: #000000;
-  font-weight: 540;
-  letter-spacing: -0.26px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .close-btn {
-  background: rgba(0, 0, 0, 0.08);
+  background: #f8f9fa;
   border: none;
   font-size: 20px;
   cursor: pointer;
-  color: #000000;
+  color: #666666;
   padding: 0;
   width: 32px;
   height: 32px;
@@ -1303,11 +1393,12 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  transition: background 0.2s;
+  transition: all 0.3s ease;
 }
 
 .close-btn:hover {
-  background: rgba(0, 0, 0, 0.12);
+  background: #e9ecef;
+  color: #000000;
 }
 
 .modal-body {
@@ -1334,25 +1425,26 @@ onMounted(() => {
 .form-group label {
   font-size: 14px;
   color: #666666;
-  font-weight: 320;
-  letter-spacing: -0.1px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
 }
 
 .form-group input,
 .form-group textarea {
   padding: 12px 16px;
-  border: 1px solid rgba(0, 0, 0, 0.15);
+  border: 1px solid #e0e0e0;
   border-radius: 8px;
-  font-size: 16px;
-  font-weight: 330;
-  letter-spacing: -0.14px;
-  transition: border-color 0.2s;
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  transition: all 0.3s ease;
   outline: none;
 }
 
 .form-group input:focus,
 .form-group textarea:focus {
   border-color: #000000;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
 }
 
 .form-group textarea {
@@ -1370,22 +1462,24 @@ onMounted(() => {
 .save-btn,
 .cancel-btn {
   padding: 12px 24px;
-  border: none;
-  border-radius: 50px;
-  font-size: 16px;
-  font-weight: 400;
-  letter-spacing: -0.14px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: all 0.3s ease;
 }
 
 .save-btn {
   background: #000000;
   color: #ffffff;
+  border: none;
 }
 
 .save-btn:hover:not(:disabled) {
-  opacity: 0.85;
+  background: rgba(0, 0, 0, 0.85);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .save-btn:disabled {
@@ -1394,19 +1488,77 @@ onMounted(() => {
 }
 
 .save-btn:focus {
-  outline: dashed 2px #000000;
+  outline: 2px solid #000000;
   outline-offset: 2px;
 }
 
 .cancel-btn {
-  background: rgba(0, 0, 0, 0.08);
-  color: #000000;
+  background: #f8f9fa;
+  color: #666666;
+  border: 1px solid #e0e0e0;
 }
 
 .cancel-btn:hover {
-  background: rgba(0, 0, 0, 0.12);
+  background: #e9ecef;
+  color: #000000;
 }
 
+/* 统计卡片 */
+.stats-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+.stat-icon {
+  font-size: 32px;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.stat-info {
+  flex: 1;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 600;
+  color: #000000;
+  letter-spacing: -0.01em;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #666666;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+}
+
+/* 数据可视化 */
 .dashboard-content {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
@@ -1415,19 +1567,24 @@ onMounted(() => {
 }
 
 .chart-container {
-  background: #fafafa;
+  background: #ffffff;
   border-radius: 8px;
-  padding: 20px;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 24px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
+  transition: all 0.3s ease;
+}
+
+.chart-container:hover {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
 }
 
 .chart-container h3 {
-  margin: 0 0 16px 0;
-  font-size: 16px;
-  color: #000000;
-  font-weight: 540;
-  letter-spacing: -0.14px;
+  margin: 0 0 20px 0;
+  font-size: 14px;
+  color: #666666;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
 }
 
 .chart {
@@ -1435,6 +1592,7 @@ onMounted(() => {
   width: 100%;
 }
 
+/* 响应式设计 */
 @media (max-width: 768px) {
   .admin-container {
     flex-direction: column;
@@ -1462,16 +1620,23 @@ onMounted(() => {
   .chart {
     height: 250px;
   }
+
+  .stats-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
+/* 深色模式 */
 .dark-mode .admin-panel {
-  background: #000000 !important;
+  background: #0a0a0a !important;
   color: #ffffff !important;
 }
 
 .dark-mode .admin-header {
-  background: #000000;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(26, 26, 26, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
 }
 
 .dark-mode .admin-header h1 {
@@ -1484,7 +1649,8 @@ onMounted(() => {
 }
 
 .dark-mode .logout-btn:hover {
-  opacity: 0.85;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.15);
 }
 
 .dark-mode .admin-sidebar {
@@ -1499,6 +1665,7 @@ onMounted(() => {
 
 .dark-mode .admin-sidebar li {
   color: #ffffff;
+  border-left-color: transparent;
 }
 
 .dark-mode .admin-sidebar li:hover {
@@ -1510,97 +1677,57 @@ onMounted(() => {
   background: rgba(255, 255, 255, 0.12);
   font-weight: 540;
   color: #ffffff;
+  border-left-color: #ffffff;
 }
 
 .dark-mode .admin-content {
-  background: #0a0a0a;
-  box-shadow: none;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #1a1a1a;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
 }
 
 .dark-mode .content-header h2 {
   color: #ffffff;
 }
 
+.dark-mode .add-btn {
+  background: #ffffff;
+  color: #000000;
+}
+
+.dark-mode .add-btn:hover {
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.15);
+}
+
 .dark-mode .search-bar input {
-  background: #1a1a1a;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: #2d2d2d;
+  border: 1px solid #3d3d3d;
   color: #ffffff;
 }
 
 .dark-mode .search-bar input:focus {
   border-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+}
+
+.dark-mode .books-table {
+  background: #1a1a1a;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .dark-mode .books-table th {
-  background: #1a1a1a;
-  color: #ffffff;
-  border-bottom-color: rgba(255, 255, 255, 0.08);
+  background: #2d2d2d;
+  color: #b0b0b0;
+  border-bottom-color: #3d3d3d;
 }
 
 .dark-mode .books-table td {
-  border-bottom-color: rgba(255, 255, 255, 0.08);
+  border-bottom-color: #3d3d3d;
   color: #ffffff;
 }
 
 .dark-mode .books-table tr:hover td {
-  background: #1a1a1a;
-}
-
-.dark-mode .empty-state h3 {
-  color: #ffffff;
-}
-
-.dark-mode .empty-state p {
-  color: #b0b0b0;
-}
-
-.dark-mode .modal-content {
-  background: #000000;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-}
-
-.dark-mode .modal-header {
-  border-bottom-color: rgba(255, 255, 255, 0.08);
-}
-
-.dark-mode .modal-header h2 {
-  color: #ffffff;
-}
-
-.dark-mode .close-btn {
-  background: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
-}
-
-.dark-mode .close-btn:hover {
-  background: rgba(255, 255, 255, 0.16);
-}
-
-.dark-mode .form-group label {
-  color: #b0b0b0;
-}
-
-.dark-mode .form-group input,
-.dark-mode .form-group textarea {
-  background: #1a1a1a;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #ffffff;
-}
-
-.dark-mode .form-group input:focus,
-.dark-mode .form-group textarea:focus {
-  border-color: #ffffff;
-}
-
-.dark-mode .chart-container {
-  background: #1a1a1a;
-  box-shadow: none;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.dark-mode .chart-container h3 {
-  color: #ffffff;
+  background: #2d2d2d;
 }
 
 .dark-mode .edit-btn {
@@ -1621,18 +1748,56 @@ onMounted(() => {
   background: rgba(255, 255, 255, 0.24);
 }
 
-.dark-mode .add-btn {
-  background: #ffffff;
-  color: #000000;
+.dark-mode .empty-state {
+  background: #2d2d2d;
 }
 
-.dark-mode .add-btn:hover {
-  opacity: 0.85;
+.dark-mode .empty-state h3 {
+  color: #ffffff;
 }
 
-.dark-mode .add-btn:focus {
-  outline: dashed 2px #ffffff;
-  outline-offset: 2px;
+.dark-mode .empty-state p {
+  color: #888888;
+}
+
+.dark-mode .modal-content {
+  background: #1a1a1a;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+.dark-mode .modal-header {
+  border-bottom-color: #3d3d3d;
+}
+
+.dark-mode .modal-header h2 {
+  color: #ffffff;
+}
+
+.dark-mode .close-btn {
+  background: #2d2d2d;
+  color: #888888;
+}
+
+.dark-mode .close-btn:hover {
+  background: #3d3d3d;
+  color: #ffffff;
+}
+
+.dark-mode .form-group label {
+  color: #b0b0b0;
+}
+
+.dark-mode .form-group input,
+.dark-mode .form-group textarea {
+  background: #2d2d2d;
+  border: 1px solid #3d3d3d;
+  color: #ffffff;
+}
+
+.dark-mode .form-group input:focus,
+.dark-mode .form-group textarea:focus {
+  border-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
 }
 
 .dark-mode .save-btn {
@@ -1640,17 +1805,53 @@ onMounted(() => {
   color: #000000;
 }
 
-.dark-mode .save-btn:focus {
-  outline: dashed 2px #ffffff;
-  outline-offset: 2px;
+.dark-mode .save-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.15);
 }
 
 .dark-mode .cancel-btn {
-  background: rgba(255, 255, 255, 0.16);
-  color: #ffffff;
+  background: #2d2d2d;
+  color: #888888;
+  border: 1px solid #3d3d3d;
 }
 
 .dark-mode .cancel-btn:hover {
-  background: rgba(255, 255, 255, 0.24);
+  background: #3d3d3d;
+  color: #ffffff;
+}
+
+.dark-mode .stat-card {
+  background: #2d2d2d;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+}
+
+.dark-mode .stat-card:hover {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.dark-mode .stat-icon {
+  background: #3d3d3d;
+}
+
+.dark-mode .stat-value {
+  color: #ffffff;
+}
+
+.dark-mode .stat-label {
+  color: #888888;
+}
+
+.dark-mode .chart-container {
+  background: #2d2d2d;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+}
+
+.dark-mode .chart-container:hover {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.dark-mode .chart-container h3 {
+  color: #888888;
 }
 </style>

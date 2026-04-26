@@ -3,6 +3,9 @@
     <header class="page-header">
       <h1>小说书库</h1>
       <p>探索精彩的小说世界</p>
+    </header>
+
+    <div class="sticky-search-container">
       <div class="search-bar">
         <input
           type="text"
@@ -12,19 +15,17 @@
         >
         <button class="search-btn" @click="handleSearch">搜索</button>
       </div>
-    </header>
 
-    <div class="category-section">
-      <h2>分类浏览</h2>
-      <div class="category-grid">
-        <div
-          v-for="cat in categoryList"
-          :key="cat"
-          class="category-card"
-          @click="handleCategorySelect(cat)"
-        >
-          <div class="category-icon">{{ getCategoryIcon(cat) }}</div>
-          <h3 class="category-name">{{ cat }}</h3>
+      <div class="category-section">
+        <div class="category-scrollbar">
+          <div
+            v-for="cat in categoryList"
+            :key="cat"
+            :class="['category-chip', { 'active': selectedCategory === cat }]"
+            @click="handleCategorySelect(cat)"
+          >
+            {{ cat }}
+          </div>
         </div>
       </div>
     </div>
@@ -33,7 +34,9 @@
       <h2>搜索结果 - "{{ searchKeyword }}"</h2>
       <div v-if="loading" class="loading">搜索中...</div>
       <div v-else-if="searchResults.length === 0" class="empty-results">
-        <p>未找到相关书籍</p>
+        <div class="empty-icon">🔍</div>
+        <h3>未找到相关书籍</h3>
+        <p>尝试使用其他关键词或浏览分类</p>
       </div>
       <div v-else class="books-grid">
         <div
@@ -83,7 +86,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 
@@ -161,6 +164,26 @@ const getCategoryIcon = (cat) => {
   }
   return iconMap[cat] || '▪'
 }
+
+// Sticky search bar logic
+const handleScroll = () => {
+  const stickyContainer = document.querySelector('.sticky-search-container')
+  if (stickyContainer) {
+    if (window.scrollY > 100) {
+      stickyContainer.classList.add('scrolled')
+    } else {
+      stickyContainer.classList.remove('scrolled')
+    }
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('scroll', handleScroll)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleScroll)
+})
 </script>
 
 <style scoped>
@@ -172,10 +195,10 @@ const getCategoryIcon = (cat) => {
 }
 
 .page-header {
-  background: #000000;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
   text-align: center;
-  padding: 80px 24px;
-  color: #ffffff;
+  padding: 60px 24px;
+  color: #333333;
 }
 
 .page-header h1 {
@@ -192,119 +215,166 @@ const getCategoryIcon = (cat) => {
   font-weight: 330;
   letter-spacing: -0.14px;
   opacity: 0.8;
-  margin-bottom: 24px;
+}
+
+/* Sticky search container */
+.sticky-search-container {
+  position: sticky;
+  top: 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  padding: 20px 24px;
+  z-index: 100;
+  transition: all 0.3s ease;
+}
+
+.sticky-search-container.scrolled {
+  padding: 12px 24px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
 .search-bar {
   display: flex;
-  max-width: 500px;
-  margin: 0 auto;
+  max-width: 600px;
+  margin: 0 auto 20px;
   gap: 12px;
 }
 
 .search-bar input {
   flex: 1;
-  padding: 14px 20px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 16px 24px;
+  border: 1px solid #e0e0e0;
   border-radius: 50px;
   font-size: 16px;
   font-weight: 330;
   letter-spacing: -0.14px;
   outline: none;
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
-  transition: border-color 0.2s;
+  background: #ffffff;
+  color: #333333;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .search-bar input::placeholder {
-  color: rgba(255, 255, 255, 0.5);
+  color: #999999;
 }
 
 .search-bar input:focus {
-  border-color: rgba(255, 255, 255, 0.5);
+  border-color: #333333;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .search-btn {
-  background: #ffffff;
-  color: #000000;
+  background: #000000;
+  color: #ffffff;
   border: none;
-  padding: 14px 32px;
+  padding: 16px 32px;
   border-radius: 50px;
   font-size: 16px;
-  font-weight: 400;
+  font-weight: 500;
   letter-spacing: -0.14px;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .search-btn:hover {
-  opacity: 0.85;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .search-btn:focus {
-  outline: dashed 2px #ffffff;
+  outline: dashed 2px #333333;
   outline-offset: 2px;
 }
 
-.empty-results {
-  text-align: center;
-  padding: 48px 0;
-  color: #666666;
-  font-size: 16px;
-  font-weight: 320;
-}
-
+/* Category section */
 .category-section {
   max-width: 1200px;
-  margin: 48px auto;
-  padding: 0 24px;
+  margin: 0 auto;
+  padding: 0;
 }
 
-.category-section h2 {
-  font-size: 32px;
-  color: #000000;
-  margin: 0 0 32px 0;
-  text-align: center;
-  font-weight: 540;
-  letter-spacing: -0.26px;
+.category-scrollbar {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: #e0e0e0 #f5f5f5;
 }
 
-.category-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
+.category-scrollbar::-webkit-scrollbar {
+  height: 6px;
 }
 
-.category-card {
-  background: #fafafa;
-  border-radius: 8px;
-  padding: 32px 24px;
-  text-align: center;
+.category-scrollbar::-webkit-scrollbar-track {
+  background: #f5f5f5;
+  border-radius: 3px;
+}
+
+.category-scrollbar::-webkit-scrollbar-thumb {
+  background: #e0e0e0;
+  border-radius: 3px;
+}
+
+.category-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #d0d0d0;
+}
+
+.category-chip {
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 400;
+  color: #333333;
+  background: #f5f5f5;
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  border: 1px solid #e0e0e0;
 }
 
-.category-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+.category-chip:hover {
+  background: #e8e8e8;
+  transform: translateY(-2px);
 }
 
-.category-icon {
-  font-size: 40px;
+.category-chip.active {
+  background: #000000;
+  color: #ffffff;
+  border-color: #000000;
+}
+
+/* Empty results */
+.empty-results {
+  text-align: center;
+  padding: 80px 0;
+  color: #666666;
+}
+
+.empty-icon {
+  font-size: 64px;
   margin-bottom: 16px;
-  color: #000000;
+  opacity: 0.5;
 }
 
-.category-name {
-  font-size: 18px;
-  color: #000000;
+.empty-results h3 {
+  font-size: 20px;
+  font-weight: 500;
+  margin: 0 0 8px 0;
+  color: #333333;
+}
+
+.empty-results p {
+  font-size: 16px;
+  font-weight: 320;
   margin: 0;
-  font-weight: 450;
-  letter-spacing: -0.14px;
+  opacity: 0.8;
 }
 
+/* Books section */
 .books-section {
   max-width: 1200px;
   margin: 48px auto;
@@ -330,36 +400,49 @@ const getCategoryIcon = (cat) => {
 .books-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 24px;
+  gap: 32px;
 }
 
 .book-card {
-  background: #fafafa;
-  border-radius: 8px;
-  overflow: hidden;
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  animation: fadeInUp 0.5s ease forwards;
+  opacity: 0;
 }
 
-.book-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+.book-card:nth-child(1) { animation-delay: 0.05s; }
+.book-card:nth-child(2) { animation-delay: 0.1s; }
+.book-card:nth-child(3) { animation-delay: 0.15s; }
+.book-card:nth-child(4) { animation-delay: 0.2s; }
+.book-card:nth-child(5) { animation-delay: 0.25s; }
+.book-card:nth-child(6) { animation-delay: 0.3s; }
+.book-card:nth-child(7) { animation-delay: 0.35s; }
+.book-card:nth-child(8) { animation-delay: 0.4s; }
+.book-card:nth-child(9) { animation-delay: 0.45s; }
+.book-card:nth-child(10) { animation-delay: 0.5s; }
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .book-cover {
   position: relative;
   width: 100%;
-  padding-top: 141.57%;
+  aspect-ratio: 3/4;
   overflow: hidden;
   background: #f0f0f0;
+  border-radius: 8px;
+  margin-bottom: 16px;
 }
 
 .book-cover img {
-  position: absolute;
-  top: 0;
-  left: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -367,17 +450,25 @@ const getCategoryIcon = (cat) => {
   transition: transform 0.3s ease;
 }
 
-.book-cover:hover img {
+.book-card:hover {
+  transform: translateY(-8px);
+}
+
+.book-card:hover .book-cover img {
   transform: scale(1.03);
 }
 
+.book-card:hover {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
+}
+
 .book-info {
-  padding: 16px;
+  padding: 0;
 }
 
 .book-title {
   font-size: 14px;
-  color: #000000;
+  color: #333333;
   margin: 0 0 6px 0;
   line-height: 1.4;
   display: -webkit-box;
@@ -402,80 +493,129 @@ const getCategoryIcon = (cat) => {
   font-size: 12px;
   font-weight: 540;
   letter-spacing: -0.1px;
-  color: #000000;
+  color: #333333;
 }
 
+/* Responsive design */
 @media (max-width: 768px) {
   .page-header {
-    padding: 56px 20px;
+    padding: 40px 20px;
   }
 
   .page-header h1 {
     font-size: 36px;
   }
 
-  .category-grid {
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  .sticky-search-container {
+    padding: 16px 16px;
+  }
+
+  .sticky-search-container.scrolled {
+    padding: 12px 16px;
+  }
+
+  .search-bar {
+    max-width: 100%;
   }
 
   .books-grid {
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 24px;
+  }
+
+  .books-section {
+    padding: 0 16px;
   }
 }
 
+/* Dark mode */
 .dark-mode .search-page {
-  background: #000000 !important;
+  background: #121212 !important;
   color: #ffffff !important;
 }
 
 .dark-mode .page-header {
-  background: #ffffff;
-  color: #000000;
+  background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
+  color: #ffffff;
+}
+
+.dark-mode .sticky-search-container {
+  background: rgba(18, 18, 18, 0.95);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.dark-mode .sticky-search-container.scrolled {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
 .dark-mode .search-bar input {
-  background: rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(0, 0, 0, 0.15);
-  color: #000000;
+  background: #2d2d2d;
+  border: 1px solid #444444;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .dark-mode .search-bar input::placeholder {
-  color: rgba(0, 0, 0, 0.4);
+  color: #888888;
 }
 
 .dark-mode .search-bar input:focus {
-  border-color: rgba(0, 0, 0, 0.3);
+  border-color: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .dark-mode .search-btn {
-  background: #000000;
-  color: #ffffff;
+  background: #ffffff;
+  color: #000000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .dark-mode .search-btn:hover {
-  opacity: 0.85;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .dark-mode .search-btn:focus {
-  outline: dashed 2px #000000;
+  outline: dashed 2px #ffffff;
   outline-offset: 2px;
 }
 
-.dark-mode .category-section h2 {
+.dark-mode .category-scrollbar {
+  scrollbar-color: #444444 #2d2d2d;
+}
+
+.dark-mode .category-scrollbar::-webkit-scrollbar-track {
+  background: #2d2d2d;
+}
+
+.dark-mode .category-scrollbar::-webkit-scrollbar-thumb {
+  background: #444444;
+}
+
+.dark-mode .category-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #555555;
+}
+
+.dark-mode .category-chip {
+  background: #2d2d2d;
   color: #ffffff;
+  border: 1px solid #444444;
 }
 
-.dark-mode .category-card {
-  background: #0a0a0a;
-  box-shadow: none;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+.dark-mode .category-chip:hover {
+  background: #3d3d3d;
 }
 
-.dark-mode .category-icon {
-  color: #ffffff;
+.dark-mode .category-chip.active {
+  background: #ffffff;
+  color: #000000;
+  border-color: #ffffff;
 }
 
-.dark-mode .category-name {
+.dark-mode .empty-results {
+  color: #888888;
+}
+
+.dark-mode .empty-results h3 {
   color: #ffffff;
 }
 
@@ -483,29 +623,27 @@ const getCategoryIcon = (cat) => {
   color: #ffffff;
 }
 
-.dark-mode .book-card {
-  background: #0a0a0a;
-  box-shadow: none;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
 .dark-mode .book-title {
   color: #ffffff;
 }
 
 .dark-mode .book-author {
-  color: #b0b0b0;
+  color: #888888;
 }
 
 .dark-mode .book-cover {
-  background: #1a1a1a;
+  background: #2d2d2d;
+}
+
+.dark-mode .book-stats {
+  color: #ffffff;
 }
 
 .dark-mode .loading {
-  color: #b0b0b0;
+  color: #888888;
 }
 
-.dark-mode .empty-results {
-  color: #b0b0b0;
+.dark-mode .book-card:hover {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
 }
 </style>
