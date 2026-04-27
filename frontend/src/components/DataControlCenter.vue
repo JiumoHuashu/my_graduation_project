@@ -8,7 +8,27 @@
       <!-- 爬虫控制区 -->
       <div class="control-panel">
         <h3>爬虫控制</h3>
-        <div class="form-grid">
+        
+        <!-- 爬取模式切换 -->
+        <div class="crawler-mode-tabs">
+          <button 
+            class="tab-btn" 
+            :class="{ active: crawlerMode === 'pages' }"
+            @click="crawlerMode = 'pages'"
+          >
+            按页码爬取
+          </button>
+          <button 
+            class="tab-btn" 
+            :class="{ active: crawlerMode === 'bookid' }"
+            @click="crawlerMode = 'bookid'"
+          >
+            按特定 ID 爬取
+          </button>
+        </div>
+        
+        <!-- 页码模式表单 -->
+        <div v-if="crawlerMode === 'pages'" class="form-grid">
           <div class="form-group">
             <label for="startPage">起始页码</label>
             <input
@@ -40,8 +60,22 @@
             >
           </div>
         </div>
+        
+        <!-- BookID模式表单 -->
+        <div v-if="crawlerMode === 'bookid'" class="form-grid">
+          <div class="form-group full-width">
+            <label for="specificBookId">Book ID</label>
+            <input
+              type="text"
+              id="specificBookId"
+              v-model="crawlerConfig.specificBookId"
+              placeholder="请输入书籍ID"
+            >
+          </div>
+        </div>
+        
         <div class="control-actions">
-          <button class="crawler-btn" @click="startCrawler" :disabled="crawlerLoading">
+          <button class="crawler-btn" :class="{ pulse: crawlerLoading }" @click="startCrawler" :disabled="crawlerLoading">
             {{ crawlerLoading ? '采集中...' : '一键启动采集' }}
           </button>
           <button class="stop-btn" @click="stopCrawler" :disabled="!crawlerLoading">
@@ -52,6 +86,10 @@
           <div class="stat-item">
             <span class="stat-label">当前采集ID:</span>
             <span class="stat-value">{{ crawlerStats.currentBookId || '未开始' }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">当前采集书名:</span>
+            <span class="stat-value">{{ crawlerStats.currentBookTitle || '未开始' }}</span>
           </div>
           <div class="stat-item">
             <span class="stat-label">已保存文件:</span>
@@ -119,15 +157,19 @@
 import { ref, reactive, nextTick, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
 
+const crawlerMode = ref('pages')
+
 const crawlerConfig = reactive({
   startPage: 81,
   endPage: 101,
-  delay: 1200
+  delay: 1200,
+  specificBookId: ''
 })
 
 const crawlerLoading = ref(false)
 const crawlerStats = reactive({
   currentBookId: '',
+  currentBookTitle: '',
   savedFiles: 0,
   errors: 0
 })
@@ -242,10 +284,20 @@ const pollCrawlerLogs = async () => {
             // Update crawler stats based on log content
             if (logContent.includes('[完成]')) {
               crawlerStats.savedFiles++
+              // Extract book title from success log
+              const titleMatch = logContent.match(/《([^》]+)》/)
+              if (titleMatch) {
+                crawlerStats.currentBookTitle = titleMatch[1]
+              }
             } else if (logContent.includes('[报错]')) {
               crawlerStats.errors++
             } else if (logContent.includes('处理 ID:')) {
               const match = logContent.match(/处理 ID: (\d+)/)
+              if (match) {
+                crawlerStats.currentBookId = match[1]
+              }
+            } else if (logContent.includes('开始按 BookID 爬取:')) {
+              const match = logContent.match(/开始按 BookID 爬取: (\d+)/)
               if (match) {
                 crawlerStats.currentBookId = match[1]
               }
@@ -282,21 +334,34 @@ const startCrawler = async () => {
   crawlerLoading.value = true
   crawlerStopped = false
   crawlerStats.currentBookId = ''
+  crawlerStats.currentBookTitle = ''
   crawlerStats.savedFiles = 0
   crawlerStats.errors = 0
 
   addConsoleLog('='.repeat(50), 'info')
   addConsoleLog('开始启动飞卢爬虫...', 'success')
-  addConsoleLog(`配置: 页码范围 ${crawlerConfig.startPage}-${crawlerConfig.endPage}, 延迟 ${crawlerConfig.delay}ms`, 'info')
+  
+  // Prepare request data based on crawler mode
+  let requestData = {}
+  if (crawlerMode.value === 'pages') {
+    requestData = {
+      start_page: crawlerConfig.startPage,
+      end_page: crawlerConfig.endPage,
+      delay: crawlerConfig.delay
+    }
+    addConsoleLog(`配置: 页码范围 ${crawlerConfig.startPage}-${crawlerConfig.endPage}, 延迟 ${crawlerConfig.delay}ms`, 'info')
+  } else {
+    requestData = {
+      book_id: crawlerConfig.specificBookId
+    }
+    addConsoleLog(`配置: Book ID ${crawlerConfig.specificBookId}`, 'info')
+  }
+  
   addConsoleLog('='.repeat(50), 'info')
 
   try {
     // Send request to start crawler
-    const response = await axios.post(`${API_BASE_URL}/admin/crawler/start/`, {
-      start_page: crawlerConfig.startPage,
-      end_page: crawlerConfig.endPage,
-      delay: crawlerConfig.delay
-    }, {
+    const response = await axios.post(`${API_BASE_URL}/admin/crawler/start/`, requestData, {
       headers: {
         Authorization: 'Bearer ' + localStorage.getItem('admin_token')
       }
@@ -457,6 +522,9 @@ onUnmounted(() => {
 <style scoped>
 .data-control-center {
   height: 100%;
+  background: #f8f9fa;
+  padding: 24px;
+  min-height: 100vh;
 }
 
 .content-header {
@@ -482,6 +550,7 @@ onUnmounted(() => {
 
 .control-panel {
   background: #ffffff;
+  border: 1px solid #e0e0e0;
   border-radius: 8px;
   padding: 24px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
@@ -522,6 +591,7 @@ onUnmounted(() => {
   border-radius: 8px;
   font-size: 14px;
   background: #f8f9fa;
+  color: #000000;
   transition: all 0.3s ease;
   outline: none;
 }
@@ -530,6 +600,42 @@ onUnmounted(() => {
   border-color: #000000;
   background: #ffffff;
   box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
+}
+
+.form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+.crawler-mode-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #f0f0f0;
+  padding-bottom: 8px;
+}
+
+.tab-btn {
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #666666;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  letter-spacing: -0.01em;
+}
+
+.tab-btn:hover {
+  background: #e9ecef;
+  color: #000000;
+}
+
+.tab-btn.active {
+  background: #000000;
+  color: #ffffff;
+  border-color: #000000;
 }
 
 .control-actions {
@@ -549,6 +655,8 @@ onUnmounted(() => {
   cursor: pointer;
   transition: all 0.3s ease;
   letter-spacing: -0.01em;
+  position: relative;
+  overflow: hidden;
 }
 
 .crawler-btn:hover:not(:disabled) {
@@ -562,6 +670,22 @@ onUnmounted(() => {
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
+}
+
+.crawler-btn.pulse {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(40, 167, 69, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+  }
 }
 
 .stop-btn {
@@ -626,29 +750,39 @@ onUnmounted(() => {
 }
 
 .crawler-stats {
-  display: flex;
-  gap: 24px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
   margin-top: 20px;
   padding-top: 20px;
   border-top: 1px solid #f0f0f0;
 }
 
 .stat-item {
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 16px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 8px;
-}
-
-.stat-item .stat-label {
-  font-size: 14px;
-  color: #666666;
-  font-weight: 500;
+  text-align: center;
 }
 
 .stat-item .stat-value {
-  font-size: 14px;
+  font-size: 24px;
+  font-weight: 700;
   color: #000000;
-  font-weight: 600;
+  line-height: 1;
+}
+
+.stat-item .stat-label {
+  font-size: 12px;
+  color: #666666;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .stat-item .stat-value.error {
@@ -678,19 +812,31 @@ onUnmounted(() => {
 
 .progress-fill {
   height: 100%;
-  background: #007bff;
+  background: linear-gradient(90deg, #007bff, #58a6ff);
   border-radius: 4px;
   transition: width 0.3s ease;
+  background-size: 200% 100%;
+  animation: stripe 1.5s linear infinite;
+}
+
+@keyframes stripe {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 .console-area {
-  background: #000000;
+  background: #0d1117;
   border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
   overflow: hidden;
   height: 400px;
   display: flex;
   flex-direction: column;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .console-header {
@@ -698,199 +844,203 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px;
-  background: #1a1a1a;
-  border-bottom: 1px solid #333333;
+  background: #161b22;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .console-header h3 {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: #00ff00;
+  color: #58a6ff;
   letter-spacing: -0.01em;
-  font-family: Consolas, Monaco, 'Courier New', monospace;
+  font-family: 'Fira Code', 'JetBrains Mono', Consolas, Monaco, 'Courier New', monospace;
 }
 
 .clear-btn {
-  background: #1a1a1a;
-  color: #00ff00;
-  border: 1px solid #00ff00;
+  background: rgba(255, 255, 255, 0.05);
+  color: #8b949e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   padding: 6px 12px;
   border-radius: 4px;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.3s ease;
-  font-family: Consolas, Monaco, 'Courier New', monospace;
+  font-family: 'Fira Code', 'JetBrains Mono', Consolas, Monaco, 'Courier New', monospace;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .clear-btn:hover {
-  background: #00ff00;
-  color: #000000;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border-color: #58a6ff;
 }
 
 .console-content {
   flex: 1;
   padding: 20px;
   overflow-y: auto;
-  font-family: Consolas, Monaco, 'Courier New', monospace;
+  font-family: 'Fira Code', 'JetBrains Mono', Consolas, Monaco, 'Courier New', monospace;
   font-size: 13px;
   line-height: 1.5;
-  background: #000000;
+  background: #0d1117;
+  position: relative;
 }
 
 .console-empty {
-  color: #666666;
+  color: #484f58;
   font-style: italic;
-  font-family: Consolas, Monaco, 'Courier New', monospace;
+  font-family: 'Fira Code', 'JetBrains Mono', Consolas, Monaco, 'Courier New', monospace;
 }
 
 .console-log {
   margin-bottom: 6px;
   display: flex;
   gap: 12px;
+  position: relative;
 }
 
 .log-time {
-  color: #00ff00;
+  color: #8b949e;
   font-weight: 500;
   min-width: 80px;
-  font-family: Consolas, Monaco, 'Courier New', monospace;
+  font-family: 'Fira Code', 'JetBrains Mono', Consolas, Monaco, 'Courier New', monospace;
 }
 
 .log-content {
-  color: #00ff00;
+  color: #c9d1d9;
   flex: 1;
   word-break: break-all;
-  font-family: Consolas, Monaco, 'Courier New', monospace;
+  font-family: 'Fira Code', 'JetBrains Mono', Consolas, Monaco, 'Courier New', monospace;
 }
 
 .log-content.success {
-  color: #00ff00;
+  color: #3fb950;
 }
 
 .log-content.error {
-  color: #ff0000;
+  color: #f85149;
 }
 
 .log-content.warning {
-  color: #ffff00;
+  color: #f2cc60;
 }
 
 .log-content.info {
-  color: #00ffff;
+  color: #58a6ff;
 }
 
 /* 深色模式 */
-.dark-mode .content-header h2 {
+.app.dark-mode .data-control-center {
+  background: #161b22;
+}
+
+.app.dark-mode .content-header h2 {
   color: #ffffff;
 }
 
-.dark-mode .control-panel {
-  background: #2d2d2d;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+.app.dark-mode .control-panel {
+  background: rgba(13, 17, 23, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
 }
 
-.dark-mode .control-panel h3 {
+.app.dark-mode .control-panel h3 {
   color: #ffffff;
 }
 
-.dark-mode .form-group input {
-  background: #3d3d3d;
-  border: 1px solid #4d4d4d;
+.app.dark-mode .form-group label {
+  color: #e6edf3;
+}
+
+.app.dark-mode .form-group input {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
   color: #ffffff;
 }
 
-.dark-mode .form-group input:focus {
-  border-color: #ffffff;
-  background: #4d4d4d;
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+.app.dark-mode .form-group input:focus {
+  border-color: #58a6ff;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
 }
 
-.dark-mode .crawler-btn {
-  background: #28a745;
+.app.dark-mode .crawler-mode-tabs {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.dark-mode .crawler-btn:hover:not(:disabled) {
-  background: #218838;
-  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+.app.dark-mode .tab-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #e6edf3;
 }
 
-.dark-mode .stop-btn {
+.app.dark-mode .tab-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.app.dark-mode .tab-btn.active {
+  background: #58a6ff;
+  border-color: #58a6ff;
+}
+
+.app.dark-mode .crawler-stats {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.app.dark-mode .stat-item {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.app.dark-mode .stat-item .stat-value {
+  color: #ffffff;
+}
+
+.app.dark-mode .stat-item .stat-label {
+  color: #8b949e;
+}
+
+.app.dark-mode .stat-item .stat-value.error {
+  color: #f85149;
+}
+
+.app.dark-mode .progress-label {
+  color: #8b949e;
+}
+
+.app.dark-mode .progress-bar {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.app.dark-mode .stop-btn {
   background: #dc3545;
 }
 
-.dark-mode .stop-btn:hover:not(:disabled) {
+.app.dark-mode .stop-btn:hover:not(:disabled) {
   background: #c82333;
   box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
 }
 
-.dark-mode .storage-btn {
+.app.dark-mode .storage-btn {
   background: #007bff;
 }
 
-.dark-mode .storage-btn:hover:not(:disabled) {
+.app.dark-mode .storage-btn:hover:not(:disabled) {
   background: #0069d9;
   box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
 }
 
-.dark-mode .storage-btn.danger {
+.app.dark-mode .storage-btn.danger {
   background: #dc3545;
 }
 
-.dark-mode .storage-btn.danger:hover:not(:disabled) {
+.app.dark-mode .storage-btn.danger:hover:not(:disabled) {
   background: #c82333;
   box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
-}
-
-.dark-mode .crawler-stats {
-  border-top-color: #3d3d3d;
-}
-
-.dark-mode .stat-item .stat-label {
-  color: #888888;
-}
-
-.dark-mode .stat-item .stat-value {
-  color: #ffffff;
-}
-
-.dark-mode .stat-item .stat-value.error {
-  color: #ff6b6b;
-}
-
-.dark-mode .progress-bar {
-  background: #3d3d3d;
-}
-
-.dark-mode .progress-fill {
-  background: #007bff;
-}
-
-.dark-mode .console-area {
-  background: #1e1e1e;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
-}
-
-.dark-mode .console-header {
-  background: #2d2d2d;
-  border-bottom-color: #3d3d3d;
-}
-
-.dark-mode .clear-btn {
-  background: #3d3d3d;
-  color: #ffffff;
-}
-
-.dark-mode .clear-btn:hover {
-  background: #4d4d4d;
-}
-
-.dark-mode .console-content {
-  background: #1e1e1e;
-}
-
-.dark-mode .console-empty {
-  color: #666666;
 }
 </style>

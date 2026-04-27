@@ -1319,12 +1319,13 @@ def user_avatar(request, user_id):
 def crawler_start(request):
     """
     启动爬虫脚本接口
-    POST: 接收页码参数，启动爬虫脚本
+    POST: 接收页码参数或book_id参数，启动爬虫脚本
     URL: /api/admin/crawler/start/
     """
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
+            book_id = data.get('book_id')
             start_page = data.get('start_page', 81)
             end_page = data.get('end_page', 101)
             
@@ -1335,13 +1336,23 @@ def crawler_start(request):
             if not os.path.exists(CRAWLER_SCRIPT):
                 return JsonResponse({"code": 404, "msg": f"爬虫脚本不存在: {CRAWLER_SCRIPT}"}, status=404)
             
-            # Start subprocess
-            process = subprocess.Popen(
-                ['python', CRAWLER_SCRIPT, str(start_page), str(end_page)],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=False
-            )
+            # Start subprocess based on parameters
+            if book_id:
+                # Run with --bookid parameter
+                process = subprocess.Popen(
+                    ['python', CRAWLER_SCRIPT, '--bookid', str(book_id)],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=False
+                )
+            else:
+                # Run with --pages parameter
+                process = subprocess.Popen(
+                    ['python', CRAWLER_SCRIPT, '--pages', str(start_page), str(end_page)],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=False
+                )
             
             # Store process information
             task_processes[task_id] = process

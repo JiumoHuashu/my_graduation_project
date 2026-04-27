@@ -182,35 +182,85 @@ def scrape_book_to_json(book_id):
         return False
 
 if __name__ == "__main__":
-    # 默认值
-    start_page = 81
-    end_page = 101
-    
-    # 从命令行参数获取
-    if len(sys.argv) > 1:
-        try:
-            start_page = int(sys.argv[1])
-        except ValueError:
-            print("起始页码必须是数字，使用默认值 81")
+    # 检查是否有 --bookid 参数
+    if "--bookid" in sys.argv:
+        bookid_index = sys.argv.index("--bookid")
+        if bookid_index + 1 < len(sys.argv):
+            bookid = sys.argv[bookid_index + 1]
+            print(f"开始按 BookID 爬取: {bookid}")
             sys.stdout.flush()
-    
-    if len(sys.argv) > 2:
-        try:
-            end_page = int(sys.argv[2])
-        except ValueError:
-            print("结束页码必须是数字，使用默认值 101")
+            scrape_book_to_json(bookid)
+            print("\n--- 任务全部完成 ---")
             sys.stdout.flush()
-    
-    print(f"开始爬取页码范围: {start_page} - {end_page}")
-    sys.stdout.flush()
-    
-    for page in range(start_page, end_page + 1):
-        list_url = f"https://b.faloo.com/y_0_0_0_0_3_5_{page}.html"
-        book_ids = get_book_ids_from_list(list_url)
-        for index, bid in enumerate(book_ids):
-            print(f"[{page}页-第{index+5}位] 处理 ID: {bid}")
+        else:
+            print("错误：--bookid 参数缺少 BookID 值")
             sys.stdout.flush()
-            scrape_book_to_json(bid)
-            time.sleep(1.2)
-    print("\n--- 任务全部完成 ---")
-    sys.stdout.flush()
+    # 检查是否有 --pages 参数
+    elif "--pages" in sys.argv:
+        # 默认值
+        start_page = 81
+        end_page = 101
+        
+        # 从命令行参数获取
+        pages_index = sys.argv.index("--pages")
+        if pages_index + 1 < len(sys.argv):
+            try:
+                start_page = int(sys.argv[pages_index + 1])
+            except ValueError:
+                print("起始页码必须是数字，使用默认值 81")
+                sys.stdout.flush()
+        
+        if pages_index + 2 < len(sys.argv):
+            try:
+                end_page = int(sys.argv[pages_index + 2])
+            except ValueError:
+                print("结束页码必须是数字，使用默认值 101")
+                sys.stdout.flush()
+        
+        print(f"开始爬取页码范围: {start_page} - {end_page}")
+        sys.stdout.flush()
+        
+        for page in range(start_page, end_page + 1):
+            list_url = f"https://b.faloo.com/y_0_0_0_0_3_5_{page}.html"
+            book_ids = get_book_ids_from_list(list_url)
+            for index, bid in enumerate(book_ids):
+                print(f"[{page}页-第{index+5}位] 处理 ID: {bid}")
+                sys.stdout.flush()
+                scrape_book_to_json(bid)
+                time.sleep(1.2)
+        print("\n--- 任务全部完成 ---")
+        sys.stdout.flush()
+    # 默认行为：按页码爬取
+    else:
+        # 默认值
+        start_page = 81
+        end_page = 101
+        
+        # 从命令行参数获取
+        if len(sys.argv) > 1:
+            try:
+                start_page = int(sys.argv[1])
+            except ValueError:
+                print("起始页码必须是数字，使用默认值 81")
+                sys.stdout.flush()
+        
+        if len(sys.argv) > 2:
+            try:
+                end_page = int(sys.argv[2])
+            except ValueError:
+                print("结束页码必须是数字，使用默认值 101")
+                sys.stdout.flush()
+        
+        print(f"开始爬取页码范围: {start_page} - {end_page}")
+        sys.stdout.flush()
+        
+        for page in range(start_page, end_page + 1):
+            list_url = f"https://b.faloo.com/y_0_0_0_0_3_5_{page}.html"
+            book_ids = get_book_ids_from_list(list_url)
+            for index, bid in enumerate(book_ids):
+                print(f"[{page}页-第{index+5}位] 处理 ID: {bid}")
+                sys.stdout.flush()
+                scrape_book_to_json(bid)
+                time.sleep(1.2)
+        print("\n--- 任务全部完成 ---")
+        sys.stdout.flush()
