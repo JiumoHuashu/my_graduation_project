@@ -38,22 +38,34 @@
     <div class="dashboard-content">
       <div class="chart-container">
         <h3>书籍分类分布</h3>
-        <div ref="categoryChart" class="chart"></div>
+        <div v-if="books.length === 0" class="empty-state">
+          <p>暂无统计数据</p>
+        </div>
+        <div v-else ref="categoryChart" class="chart"></div>
       </div>
 
       <div class="chart-container">
-        <h3>书籍阅读量统计</h3>
-        <div ref="readCountChart" class="chart"></div>
+        <h3>书籍阅读量分布</h3>
+        <div v-if="books.length === 0" class="empty-state">
+          <p>暂无统计数据</p>
+        </div>
+        <div v-else ref="readCountChart" class="chart"></div>
       </div>
 
       <div class="chart-container">
         <h3>书籍字数分布</h3>
-        <div ref="wordCountChart" class="chart"></div>
+        <div v-if="books.length === 0" class="empty-state">
+          <p>暂无统计数据</p>
+        </div>
+        <div v-else ref="wordCountChart" class="chart"></div>
       </div>
 
       <div class="chart-container">
-        <h3>书籍1-10分评分分布</h3>
-        <div ref="ratingChart" class="chart"></div>
+        <h3>书籍评分分布</h3>
+        <div v-if="books.length === 0" class="empty-state">
+          <p>暂无统计数据</p>
+        </div>
+        <div v-else ref="ratingChart" class="chart"></div>
       </div>
     </div>
   </div>
@@ -66,6 +78,8 @@ import * as echarts from 'echarts'
 
 const books = ref([])
 const users = ref([])
+const ratings = ref([])
+const bookshelfData = ref({})
 
 const categoryChart = ref(null)
 const readCountChart = ref(null)
@@ -88,12 +102,54 @@ const topBookTitle = computed(() => {
   return topBook.title.length > 10 ? topBook.title.substring(0, 10) + '...' : topBook.title
 })
 
+const readCountDistribution = computed(() => {
+  const ranges = [
+    { name: '0-10万', min: 0, max: 100000, count: 0 },
+    { name: '10-50万', min: 100000, max: 500000, count: 0 },
+    { name: '50-100万', min: 500000, max: 1000000, count: 0 },
+    { name: '100-500万', min: 1000000, max: 5000000, count: 0 },
+    { name: '500万以上', min: 5000000, max: Infinity, count: 0 }
+  ]
+
+  books.value.forEach(book => {
+    const readCount = book.read_count || 0
+    for (const range of ranges) {
+      if (readCount >= range.min && readCount < range.max) {
+        range.count++
+        break
+      }
+    }
+  })
+
+  return ranges
+})
+
+const ratingDistribution = computed(() => {
+  const ranges = [
+    { name: '1-3分（低）', min: 1, max: 4, count: 0, color: '#94a3b8' },
+    { name: '4-6分（中）', min: 4, max: 7, count: 0, color: '#60a5fa' },
+    { name: '7-8分（高）', min: 7, max: 9, count: 0, color: '#34d399' },
+    { name: '9-10分（顶尖）', min: 9, max: 11, count: 0, color: '#f59e0b' }
+  ]
+
+  ratings.value.forEach(rating => {
+    const score = rating.score
+    for (const range of ranges) {
+      if (score >= range.min && score < range.max) {
+        range.count++
+        break
+      }
+    }
+  })
+
+  return ranges
+})
+
 const fetchBooks = async () => {
   try {
     const res = await axios.get('http://127.0.0.1:8000/api/admin/books/')
     if (res.data.code === 200) {
       books.value = res.data.data
-      initCharts()
     }
   } catch (error) {
     console.error('获取书籍列表失败:', error)
@@ -105,9 +161,40 @@ const fetchUsers = async () => {
     const res = await axios.get('http://127.0.0.1:8000/api/admin/users/')
     if (res.data.code === 200) {
       users.value = res.data.data
+      await fetchBookshelfData()
     }
   } catch (error) {
     console.error('获取用户列表失败:', error)
+  }
+}
+
+const fetchRatings = async () => {
+  try {
+    const allRatings = []
+    for (const user of users.value) {
+      const res = await axios.get(`http://127.0.0.1:8000/api/user/rating/?user_id=${user.id}`)
+      if (res.data.code === 200 && res.data.data) {
+        allRatings.push(...res.data.data)
+      }
+    }
+    ratings.value = allRatings
+  } catch (error) {
+    console.error('获取评分数据失败:', error)
+  }
+}
+
+const fetchBookshelfData = async () => {
+  try {
+    const data = {}
+    for (const user of users.value) {
+      const res = await axios.get(`http://127.0.0.1:8000/api/user/bookshelf/?user_id=${user.id}`)
+      if (res.data.code === 200 && res.data.data) {
+        data[user.id] = res.data.data
+      }
+    }
+    bookshelfData.value = data
+  } catch (error) {
+    console.error('获取书架数据失败:', error)
   }
 }
 
@@ -136,12 +223,18 @@ const initCategoryChart = () => {
   const option = {
     tooltip: {
       trigger: 'item',
-      formatter: '{a} <br/>{b}: {c} ({d}%)'
+      formatter: '{a} <br/>{b}: {c} ({d}%)',
+      textStyle: {
+        color: '#8b949e'
+      }
     },
     legend: {
       orient: 'vertical',
       left: 10,
-      data: categories
+      data: categories,
+      textStyle: {
+        color: '#8b949e'
+      }
     },
     series: [
       {
@@ -162,7 +255,8 @@ const initCategoryChart = () => {
           label: {
             show: true,
             fontSize: 18,
-            fontWeight: 'bold'
+            fontWeight: 'bold',
+            color: '#ffffff'
           }
         },
         labelLine: {
@@ -188,18 +282,18 @@ const initReadCountChart = () => {
 
   readCountChartInstance = echarts.init(readCountChart.value)
 
-  const topBooks = [...books.value]
-    .sort((a, b) => b.read_count - a.read_count)
-    .slice(0, 10)
-
-  const titles = topBooks.map(book => book.title)
-  const readCounts = topBooks.map(book => book.read_count)
+  const distribution = readCountDistribution.value
+  const ranges = distribution.map(range => range.name)
+  const counts = distribution.map(range => range.count)
 
   const option = {
     tooltip: {
       trigger: 'axis',
       axisPointer: {
         type: 'shadow'
+      },
+      textStyle: {
+        color: '#8b949e'
       }
     },
     grid: {
@@ -209,27 +303,27 @@ const initReadCountChart = () => {
       containLabel: true
     },
     xAxis: {
-      type: 'value',
-      boundaryGap: [0, 0.01]
+      type: 'category',
+      data: ranges,
+      axisLabel: {
+        color: '#8b949e'
+      }
     },
     yAxis: {
-      type: 'category',
-      data: titles,
+      type: 'value',
       axisLabel: {
-        interval: 0,
-        rotate: 30
+        color: '#8b949e'
       }
     },
     series: [
       {
-        name: '阅读量',
+        name: '书籍数量',
         type: 'bar',
-        data: readCounts,
+        data: counts,
         itemStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-            { offset: 0, color: '#83bff6' },
-            { offset: 0.5, color: '#188df0' },
-            { offset: 1, color: '#188df0' }
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: '#388bfd' },
+            { offset: 1, color: '#79c0ff' }
           ])
         }
       }
@@ -274,6 +368,9 @@ const initWordCountChart = () => {
       trigger: 'axis',
       axisPointer: {
         type: 'shadow'
+      },
+      textStyle: {
+        color: '#8b949e'
       }
     },
     grid: {
@@ -284,10 +381,16 @@ const initWordCountChart = () => {
     },
     xAxis: {
       type: 'category',
-      data: ranges
+      data: ranges,
+      axisLabel: {
+        color: '#8b949e'
+      }
     },
     yAxis: {
-      type: 'value'
+      type: 'value',
+      axisLabel: {
+        color: '#8b949e'
+      }
     },
     series: [
       {
@@ -297,7 +400,6 @@ const initWordCountChart = () => {
         itemStyle: {
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
             { offset: 0, color: '#fccb05' },
-            { offset: 0.5, color: '#f5804e' },
             { offset: 1, color: '#f5804e' }
           ])
         }
@@ -317,64 +419,58 @@ const initRatingChart = () => {
 
   ratingChartInstance = echarts.init(ratingChart.value)
 
-  const ratingRanges = [
-    { name: '1', min: 1, max: 2, count: 0 },
-    { name: '2', min: 2, max: 3, count: 0 },
-    { name: '3', min: 3, max: 4, count: 0 },
-    { name: '4', min: 4, max: 5, count: 0 },
-    { name: '5', min: 5, max: 6, count: 0 },
-    { name: '6', min: 6, max: 7, count: 0 },
-    { name: '7', min: 7, max: 8, count: 0 },
-    { name: '8', min: 8, max: 9, count: 0 },
-    { name: '9', min: 9, max: 10, count: 0 },
-    { name: '10', min: 10, max: 11, count: 0 }
-  ]
-
-  books.value.forEach(book => {
-    const rating = book.rating || 0
-    for (const range of ratingRanges) {
-      if (rating >= range.min && rating < range.max) {
-        range.count++
-        break
-      }
+  const distribution = ratingDistribution.value
+  const data = distribution.map(range => ({
+    value: range.count,
+    name: range.name,
+    itemStyle: {
+      color: range.color
     }
-  })
-
-  const ranges = ratingRanges.map(range => range.name)
-  const counts = ratingRanges.map(range => range.count)
+  }))
 
   const option = {
     tooltip: {
-      trigger: 'axis',
-      axisPointer: {
-        type: 'shadow'
+      trigger: 'item',
+      formatter: '{a} <br/>{b}: {c} ({d}%)',
+      textStyle: {
+        color: '#8b949e'
       }
     },
-    grid: {
-      left: '3%',
-      right: '4%',
-      bottom: '3%',
-      containLabel: true
-    },
-    xAxis: {
-      type: 'category',
-      data: ranges
-    },
-    yAxis: {
-      type: 'value'
+    legend: {
+      orient: 'vertical',
+      left: 10,
+      data: distribution.map(range => range.name),
+      textStyle: {
+        color: '#8b949e'
+      }
     },
     series: [
       {
-        name: '书籍数量',
-        type: 'bar',
-        data: counts,
+        name: '书籍评分',
+        type: 'pie',
+        radius: ['40%', '70%'],
+        avoidLabelOverlap: false,
         itemStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: '#40c9c6' },
-            { offset: 0.5, color: '#5168e2' },
-            { offset: 1, color: '#5168e2' }
-          ])
-        }
+          borderRadius: 10,
+          borderColor: '#fff',
+          borderWidth: 2
+        },
+        label: {
+          show: false,
+          position: 'center'
+        },
+        emphasis: {
+          label: {
+            show: true,
+            fontSize: 18,
+            fontWeight: 'bold',
+            color: '#ffffff'
+          }
+        },
+        labelLine: {
+          show: false
+        },
+        data: data
       }
     ]
   }
@@ -398,13 +494,15 @@ const resizeCharts = () => {
   ratingChartInstance?.resize()
 }
 
-watch(books, () => {
+watch([books, ratings], () => {
   initCharts()
 }, { deep: true })
 
-onMounted(() => {
-  fetchBooks()
-  fetchUsers()
+onMounted(async () => {
+  await fetchBooks()
+  await fetchUsers()
+  await fetchRatings()
+  initCharts()
   window.addEventListener('resize', resizeCharts)
 })
 
@@ -504,6 +602,7 @@ onUnmounted(() => {
   padding: 24px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
   transition: all 0.3s ease;
+  position: relative;
 }
 
 .chart-container:hover {
@@ -522,6 +621,15 @@ onUnmounted(() => {
 .chart {
   height: 300px;
   width: 100%;
+}
+
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  color: #999;
+  font-size: 16px;
 }
 
 /* 深色模式 */
@@ -561,5 +669,38 @@ onUnmounted(() => {
 
 .dark-mode .chart-container h3 {
   color: #888888;
+}
+
+.dark-mode .empty-state {
+  color: #666;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .dashboard-content {
+    grid-template-columns: 1fr;
+  }
+  
+  .stats-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .stats-cards {
+    grid-template-columns: 1fr;
+  }
+  
+  .chart-container {
+    padding: 16px;
+  }
+  
+  .chart {
+    height: 250px;
+  }
+  
+  .empty-state {
+    height: 250px;
+  }
 }
 </style>

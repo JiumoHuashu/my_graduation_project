@@ -679,10 +679,11 @@ def book_recommend_by_bookshelf(request):
         import os
 
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        metadata_file = os.path.join(base_dir, 'model_metadata_advanced.pkl')
-        vector_file = os.path.join(base_dir, 'book_vectors_advanced.pt')
+        model_dir = os.path.join(base_dir, 'model_output')
+        metadata_path = os.path.join(model_dir, 'metadata.pkl')
+        vector_path = os.path.join(model_dir, 'vectors.pt')
 
-        if not os.path.exists(metadata_file) or not os.path.exists(vector_file):
+        if not os.path.exists(metadata_path) or not os.path.exists(vector_path):
             shelf_books = FalooBook.objects.filter(book_id__in=bookshelf_data)
             if not shelf_books.exists():
                 return JsonResponse({"code": 404, "msg": "书架中没有找到书籍"}, status=404)
@@ -713,26 +714,21 @@ def book_recommend_by_bookshelf(request):
                     "introduction": book.introduction
                 })
         else:
-            with open(metadata_file, 'rb') as f:
-                metadata = pickle.load(f)
-            df = metadata['df']
-            encoders = metadata['encoders']
-            book_vectors = torch.load(vector_file)
+            # 加载新模型
+            with open(metadata_path, 'rb') as f:
+                meta = pickle.load(f)
+            vectors = torch.load(vector_path, map_location='cpu')
+            
+            titles = meta['titles']
+            book_features = (vectors['sem'] + vectors['attr']) / 2
 
             shelf_books = FalooBook.objects.filter(book_id__in=bookshelf_data)
             book_titles = [book.title for book in shelf_books]
 
-            selected_vecs = []
-            found_titles = []
-
-            for title in book_titles:
-                match = df[df['title'].str.contains(title, na=False)]
-                if not match.empty:
-                    idx = match.index[0]
-                    selected_vecs.append(book_vectors[idx])
-                    found_titles.append(df.iloc[idx]['title'])
-
-            if not selected_vecs:
+            # 寻找匹配的索引
+            target_idxs = [i for i, t in enumerate(titles) if t in book_titles]
+            
+            if not target_idxs:
                 categories = set()
                 for book in shelf_books:
                     categories.add(book.main_category)
@@ -759,15 +755,25 @@ def book_recommend_by_bookshelf(request):
                         "introduction": book.introduction
                     })
             else:
-                combined_vec = torch.stack(selected_vecs).mean(dim=0).unsqueeze(0)
-                sims = torch.mm(combined_vec, book_vectors.t()).squeeze(0)
-                scores, indices = torch.topk(sims, k=min(25, len(df)))
+                # 计算输入书籍的平均特征向量
+                query_vec = book_features[target_idxs].mean(dim=0, keepdim=True)
+                
+                # 计算余弦相似度
+                scores = torch.cosine_similarity(query_vec, book_features)
+                
+                # 排除掉输入的书本身
+                for idx in target_idxs:
+                    scores[idx] = -1.0
+                
+                # 提取 Top K
+                vals, idxs = torch.topk(scores, min(25, len(titles)))
 
                 data = []
                 count = 0
-                for i in range(len(indices)):
-                    res_idx = indices[i].item()
-                    target_title = df.iloc[res_idx]['title']
+                found_titles = [titles[idx] for idx in target_idxs]
+                
+                for i, idx in enumerate(idxs):
+                    target_title = titles[idx.item()]
 
                     if target_title in found_titles:
                         continue
@@ -1870,10 +1876,21 @@ def post_interests(request):
         try:
             data = json.loads(request.body)
             tags = data.get('tags', [])
+            user_id = data.get('user_id')
             
             # 验证标签数量
             if len(tags) < 3 or len(tags) > 5:
                 return JsonResponse({"code": 400, "msg": "请选择3-5个标签"}, status=400)
+            
+            # 获取用户标记为不感兴趣的书籍ID列表
+            disliked_book_ids = []
+            if user_id:
+                try:
+                    user = User.objects.get(id=user_id)
+                    disliked_actions = UserActionLog.objects.filter(user=user, action_type='dislike')
+                    disliked_book_ids = [action.book_id for action in disliked_actions]
+                except User.DoesNotExist:
+                    pass
             
             # 集成BERT模型计算标签组合的语义向量
             import torch
@@ -1881,12 +1898,13 @@ def post_interests(request):
             import os
             
             base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            metadata_file = os.path.join(base_dir, 'model_metadata_advanced.pkl')
-            vector_file = os.path.join(base_dir, 'book_vectors_advanced.pt')
+            model_dir = os.path.join(base_dir, 'model_output')
+            metadata_path = os.path.join(model_dir, 'metadata.pkl')
+            vector_path = os.path.join(model_dir, 'vectors.pt')
             
-            if not os.path.exists(metadata_file) or not os.path.exists(vector_file):
+            if not os.path.exists(metadata_path) or not os.path.exists(vector_path):
                 # 如果模型文件不存在，返回基于阅读量的推荐
-                books = FalooBook.objects.order_by('-read_count')[:10]
+                books = FalooBook.objects.exclude(book_id__in=disliked_book_ids).order_by('-read_count')[:16]
                 
                 data = []
                 for i, book in enumerate(books):
@@ -1908,12 +1926,13 @@ def post_interests(request):
                         "tags": book.tags
                     })
             else:
-                # 加载模型和向量
-                with open(metadata_file, 'rb') as f:
-                    metadata = pickle.load(f)
-                df = metadata['df']
-                encoders = metadata['encoders']
-                book_vectors = torch.load(vector_file)
+                # 加载新模型
+                with open(metadata_path, 'rb') as f:
+                    meta = pickle.load(f)
+                vectors = torch.load(vector_path, map_location='cpu')
+                
+                titles = meta['titles']
+                book_features = (vectors['sem'] + vectors['attr']) / 2
                 
                 # 计算标签组合的语义向量
                 # 这里使用一个简单的方法：找到包含这些标签的书籍，取它们的向量平均值
@@ -1932,28 +1951,32 @@ def post_interests(request):
                 # 计算标签向量
                 tag_vectors = []
                 for title in matching_titles:
-                    match = df[df['title'].str.contains(title, na=False)]
-                    if not match.empty:
-                        idx = match.index[0]
-                        tag_vectors.append(book_vectors[idx])
+                    if title in titles:
+                        idx = titles.index(title)
+                        tag_vectors.append(book_features[idx])
                 
                 if tag_vectors:
                     # 计算标签向量的平均值
                     tag_vector = torch.stack(tag_vectors).mean(dim=0).unsqueeze(0)
                     
                     # 计算余弦相似度
-                    sims = torch.mm(tag_vector, book_vectors.t()).squeeze(0)
-                    scores, indices = torch.topk(sims, k=min(25, len(df)))
+                    scores = torch.cosine_similarity(tag_vector, book_features)
+                    
+                    # 提取 Top K（多取一些以过滤不感兴趣的书籍）
+                    vals, idxs = torch.topk(scores, min(50, len(titles)))
                     
                     # 生成推荐结果
                     data = []
                     count = 0
-                    for i in range(len(indices)):
-                        res_idx = indices[i].item()
-                        target_title = df.iloc[res_idx]['title']
+                    for i, idx in enumerate(idxs):
+                        target_title = titles[idx.item()]
                         
                         book = FalooBook.objects.filter(title=target_title).first()
                         if not book:
+                            continue
+                        
+                        # 过滤掉用户标记为不感兴趣的书籍
+                        if book.book_id in disliked_book_ids:
                             continue
                         
                         count += 1
@@ -1975,11 +1998,11 @@ def post_interests(request):
                             "tags": book.tags
                         })
                         
-                        if count >= 10:
+                        if count >= 16:
                             break
                 else:
                     # 如果没有找到匹配的标签，返回基于阅读量的推荐
-                    books = FalooBook.objects.order_by('-read_count')[:10]
+                    books = FalooBook.objects.exclude(book_id__in=disliked_book_ids).order_by('-read_count')[:16]
                     
                     data = []
                     for i, book in enumerate(books):

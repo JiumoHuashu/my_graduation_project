@@ -107,9 +107,9 @@
               <span class="action-icon">❤️</span>
               <span class="action-text">{{ isLiked ? '已收藏' : '收藏' }}</span>
             </button>
-            <button class="action-btn dislike-btn" @click="handleUserAction('dislike')">
+            <button class="action-btn dislike-btn" :class="{ 'disliked': isDisliked }" @click="handleUserAction('dislike')">
               <span class="action-icon">✕</span>
-              <span class="action-text">不感兴趣</span>
+              <span class="action-text">{{ isDisliked ? '取消不感兴趣' : '不感兴趣' }}</span>
             </button>
           </div>
         </div>
@@ -195,6 +195,27 @@
         </div>
       </div>
     </div>
+
+    <!-- 不感兴趣弹窗 -->
+    <div v-if="dislikeModalVisible" class="dislike-modal-overlay" @click="cancelDislikeModal">
+      <div class="dislike-modal" @click.stop>
+        <div class="dislike-modal-header">
+          <h3>选择原因</h3>
+          <button class="close-btn" @click="cancelDislikeModal">✕</button>
+        </div>
+        <div class="dislike-modal-body">
+          <div 
+            v-for="option in dislikeOptions" 
+            :key="option.value"
+            class="dislike-option"
+            @click="handleDislikeOptionClick(option.value)"
+          >
+            <span class="option-icon">{{ option.icon }}</span>
+            <span class="option-label">{{ option.label }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -225,6 +246,16 @@ const ratingCount = ref(0)
 const isRating = ref(false)
 const ratingError = ref('')
 
+// 不感兴趣相关状态
+const dislikeModalVisible = ref(false)
+const isDisliked = ref(false)
+const dislikeOptions = [
+  { value: 'not_interested', label: '不感兴趣', icon: '😐' },
+  { value: 'already_read', label: '已经读过', icon: '📖' },
+  { value: 'content_issue', label: '内容不合口味', icon: '👎' },
+  { value: 'wrong_category', label: '分类不对', icon: '🏷️' }
+]
+
 const fetchBookDetail = async () => {
   loading.value = true
   error.value = ''
@@ -242,6 +273,7 @@ const fetchBookDetail = async () => {
       )
       await checkIfInBookshelf()
       await checkIfLiked()
+      await checkIfDisliked()
       await fetchBookRating()
       await fetchUserRating()
     } else {
@@ -478,30 +510,128 @@ const handleUserAction = async (actionType) => {
     }
 
     const user = JSON.parse(savedUser)
-    const res = await axios.post('http://127.0.0.1:8000/api/user/action/', {
-      user_id: user.id,
-      book_id: book.value.book_id,
-      action_type: actionType
-    })
 
-    if (res.data.code === 200) {
-      // 对于收藏行为，更新isLiked状态
-      if (actionType === 'like') {
-        isLiked.value = !isLiked.value
-        
-        // 处理补偿推荐
-        if (res.data.compensation_recommendations && res.data.compensation_recommendations.length > 0) {
-          // 将补偿推荐的书籍添加到本地存储，供首页使用
-          localStorage.setItem('compensation_recommendations', JSON.stringify(res.data.compensation_recommendations))
-          // 提示用户有新的推荐
-          alert('我们为您推荐了一些相似的书籍，请到首页查看！')
-        }
+    if (actionType === 'dislike') {
+      if (isDisliked.value) {
+        await undoDislike()
+      } else {
+        dislikeModalVisible.value = true
       }
     } else {
-      console.error('提交行为反馈失败:', res.data.msg)
+      const res = await axios.post('http://127.0.0.1:8000/api/user/action/', {
+        user_id: user.id,
+        book_id: book.value.book_id,
+        action_type: actionType
+      })
+
+      if (res.data.code === 200) {
+        if (actionType === 'like') {
+          isLiked.value = !isLiked.value
+          
+          if (res.data.compensation_recommendations && res.data.compensation_recommendations.length > 0) {
+            localStorage.setItem('compensation_recommendations', JSON.stringify(res.data.compensation_recommendations))
+            alert('我们为您推荐了一些相似的书籍，请到首页查看！')
+          }
+        }
+      } else {
+        console.error('提交行为反馈失败:', res.data.msg)
+      }
     }
   } catch (error) {
     console.error('提交行为反馈失败:', error)
+  }
+}
+
+const checkIfDisliked = async () => {
+  if (!book.value) {
+    isDisliked.value = false
+    return
+  }
+
+  try {
+    const savedUser = localStorage.getItem('user')
+    if (!savedUser) {
+      isDisliked.value = false
+      return
+    }
+
+    const user = JSON.parse(savedUser)
+    const res = await axios.get('http://127.0.0.1:8000/api/user/actions/', {
+      params: {
+        user_id: user.id,
+        action_type: 'dislike'
+      }
+    })
+
+    if (res.data.code === 200) {
+      const actions = res.data.data
+      isDisliked.value = actions.some(action => action.book_id === book.value.book_id)
+    } else {
+      isDisliked.value = false
+    }
+  } catch (error) {
+    console.error('检查不感兴趣状态失败:', error)
+    isDisliked.value = false
+  }
+}
+
+const handleDislikeOptionClick = async (reason) => {
+  if (!book.value) return
+
+  const savedUser = localStorage.getItem('user')
+  if (!savedUser) {
+    return
+  }
+
+  const user = JSON.parse(savedUser)
+
+  try {
+    await axios.post('http://127.0.0.1:8000/api/user/action/', {
+      user_id: user.id,
+      book_id: book.value.book_id,
+      action_type: 'dislike',
+      reason: reason
+    })
+
+    isDisliked.value = true
+  } catch (err) {
+    console.error('处理不感兴趣失败:', err)
+  }
+
+  dislikeModalVisible.value = false
+}
+
+const cancelDislikeModal = () => {
+  dislikeModalVisible.value = false
+}
+
+const undoDislike = async () => {
+  if (!book.value) return
+
+  const savedUser = localStorage.getItem('user')
+  if (!savedUser) {
+    return
+  }
+
+  const user = JSON.parse(savedUser)
+
+  try {
+    const res = await axios.get('http://127.0.0.1:8000/api/user/actions/', {
+      params: {
+        user_id: user.id,
+        action_type: 'dislike'
+      }
+    })
+
+    if (res.data.code === 200) {
+      const dislikeAction = res.data.data.find(action => action.book_id === book.value.book_id)
+      if (dislikeAction && dislikeAction.id) {
+        await axios.delete(`http://127.0.0.1:8000/api/user/action/${dislikeAction.id}/`)
+        isDisliked.value = false
+      }
+    }
+  } catch (err) {
+    console.error('撤销不感兴趣失败:', err)
   }
 }
 
@@ -1374,6 +1504,169 @@ watch(() => props.bookId, (newId) => {
 
 .dark-mode .bar-value {
   color: #b0b0b0;
+}
+
+/* 不感兴趣弹窗 */
+.dislike-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.dislike-modal {
+  background: white;
+  border-radius: 12px;
+  width: 80%;
+  max-width: 280px;
+  aspect-ratio: 1;
+  overflow: hidden;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+}
+
+.dislike-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #eee;
+  flex-shrink: 0;
+}
+
+.dislike-modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: #999;
+  cursor: pointer;
+  padding: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.close-btn:hover {
+  background: #f5f5f5;
+  color: #666;
+}
+
+.dislike-modal-body {
+  flex: 1;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.dislike-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: #f8f9fa;
+}
+
+.dislike-option:hover {
+  background: #e9ecef;
+  transform: scale(1.02);
+}
+
+.dislike-option:active {
+  transform: scale(0.98);
+}
+
+.option-icon {
+  font-size: 32px;
+  margin-bottom: 6px;
+}
+
+.option-label {
+  font-size: 13px;
+  color: #555;
+  text-align: center;
+}
+
+.dislike-btn.disliked {
+  background: #666666;
+  color: #ffffff;
+  border-color: #666666;
+}
+
+.dislike-btn.disliked:hover {
+  background: #555555;
+  box-shadow: 0 4px 12px rgba(102, 102, 102, 0.3);
+}
+
+/* 深色模式弹窗 */
+.dark-mode .dislike-modal-overlay {
+  background: rgba(0, 0, 0, 0.8) !important;
+}
+
+.dark-mode .dislike-modal {
+  background: #1a1a1a;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+}
+
+.dark-mode .dislike-modal-header {
+  border-bottom-color: #333;
+}
+
+.dark-mode .dislike-modal-header h3 {
+  color: #fff;
+}
+
+.dark-mode .close-btn {
+  color: #666;
+}
+
+.dark-mode .close-btn:hover {
+  background: #333;
+  color: #fff;
+}
+
+.dark-mode .dislike-option {
+  background: #2a2a2a;
+}
+
+.dark-mode .dislike-option:hover {
+  background: #333;
+}
+
+.dark-mode .option-label {
+  color: #ccc;
+}
+
+.dark-mode .dislike-btn.disliked {
+  background: #444444;
+  color: #ffffff;
+  border-color: #444444;
+}
+
+.dark-mode .dislike-btn.disliked:hover {
+  background: #555555;
 }
 
 /* 动画效果 */

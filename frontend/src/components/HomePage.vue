@@ -128,7 +128,7 @@
           <div class="books-grid-container">
             <div class="books-grid">
               <div
-                v-for="(book, index) in recommendations.slice(0, 10)"
+                v-for="(book, index) in recommendations.slice(0, 16)"
                 :key="index"
                 class="book-card"
               >
@@ -162,6 +162,12 @@
                     </div>
                   </div>
                 </div>
+                <div v-if="dislikedBookIds.includes(book.book_id)" class="dislike-overlay">
+                  <div class="dislike-content">
+                    <p class="dislike-text">不再推荐</p>
+                    <button class="undo-btn" @click="undoDislike(book.book_id)">撤销</button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -177,6 +183,27 @@
       :visible="interestRadarVisible" 
       @confirm="handleInterestConfirm"
     />
+
+    <!-- 不感兴趣弹窗 -->
+    <div v-if="dislikeModalVisible" class="dislike-modal-overlay" @click="cancelDislike">
+      <div class="dislike-modal" @click.stop>
+        <div class="dislike-modal-header">
+          <h3>选择原因</h3>
+          <button class="close-btn" @click="cancelDislike">✕</button>
+        </div>
+        <div class="dislike-modal-body">
+          <div 
+            v-for="option in dislikeOptions" 
+            :key="option.value"
+            class="dislike-option"
+            @click="handleDislikeOptionClick(option.value)"
+          >
+            <span class="option-icon">{{ option.icon }}</span>
+            <span class="option-label">{{ option.label }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -199,7 +226,19 @@ const loading = ref(false)
 const error = ref('')
 const interestRadarVisible = ref(false)
 const likedBooks = ref({})
+const dislikedBookIds = ref([])
 const recommendationChart = ref(null)
+
+// 不感兴趣相关状态
+const dislikeModalVisible = ref(false)
+const currentDislikeBookId = ref(null)
+const dislikedBooks = ref([])
+const dislikeOptions = [
+  { value: 'not_interested', label: '不感兴趣', icon: '😐' },
+  { value: 'already_read', label: '已经读过', icon: '📖' },
+  { value: 'content_issue', label: '内容不合口味', icon: '👎' },
+  { value: 'wrong_category', label: '分类不对', icon: '🏷️' }
+]
 
 const selectMode = (mode) => {
   selectedMode.value = mode
@@ -225,12 +264,17 @@ const handleInterestConfirm = async (tags) => {
   error.value = ''
   
   try {
+    const savedUser = localStorage.getItem('user')
+    const userId = savedUser ? JSON.parse(savedUser).id : null
+    
     const res = await axios.post('http://127.0.0.1:8000/api/interests/', {
-      tags: tags
+      tags: tags,
+      user_id: userId
     })
     
     if (res.data.code === 200) {
       recommendations.value = res.data.data
+      localStorage.setItem('selectedInterestTags', JSON.stringify(tags))
     } else {
       error.value = res.data.msg
     }
@@ -311,32 +355,134 @@ const handleUserAction = async (bookId, actionType) => {
     }
 
     const user = JSON.parse(savedUser)
-    const res = await axios.post('http://127.0.0.1:8000/api/user/action/', {
-      user_id: user.id,
-      book_id: bookId,
-      action_type: actionType
-    })
 
-    if (res.data.code === 200) {
-      // 对于收藏行为，更新likedBooks状态
-      if (actionType === 'like') {
-        likedBooks.value[bookId] = !likedBooks.value[bookId]
-        
-        // 处理补偿推荐
-        if (res.data.compensation_recommendations && res.data.compensation_recommendations.length > 0) {
-          // 将补偿推荐的书籍添加到本地存储，供首页使用
-          localStorage.setItem('compensation_recommendations', JSON.stringify(res.data.compensation_recommendations))
-          // 重新加载推荐列表，显示补偿推荐
-          await loadInitialRecommendations()
-          // 提示用户有新的推荐
-          alert('我们为您推荐了一些相似的书籍，请到首页查看！')
-        }
-      }
+    if (actionType === 'dislike') {
+      currentDislikeBookId.value = bookId
+      dislikeModalVisible.value = true
     } else {
-      console.error('提交行为反馈失败:', res.data.msg)
+      const res = await axios.post('http://127.0.0.1:8000/api/user/action/', {
+        user_id: user.id,
+        book_id: bookId,
+        action_type: actionType
+      })
+
+      if (res.data.code === 200) {
+        if (actionType === 'like') {
+          likedBooks.value[bookId] = !likedBooks.value[bookId]
+          
+          if (res.data.compensation_recommendations && res.data.compensation_recommendations.length > 0) {
+            localStorage.setItem('compensation_recommendations', JSON.stringify(res.data.compensation_recommendations))
+            await loadInitialRecommendations()
+            alert('我们为您推荐了一些相似的书籍，请到首页查看！')
+          }
+        }
+      } else {
+        console.error('提交行为反馈失败:', res.data.msg)
+      }
     }
   } catch (error) {
     console.error('提交行为反馈失败:', error)
+  }
+}
+
+const selectedDislikeReason = ref('')
+
+const confirmDislike = async () => {
+  if (!selectedDislikeReason.value) {
+    return
+  }
+
+  const savedUser = localStorage.getItem('user')
+  if (!savedUser) {
+    return
+  }
+
+  const user = JSON.parse(savedUser)
+  const bookId = currentDislikeBookId.value
+
+  try {
+    await axios.post('http://127.0.0.1:8000/api/user/action/', {
+      user_id: user.id,
+      book_id: bookId,
+      action_type: 'dislike',
+      reason: selectedDislikeReason.value
+    })
+
+    dislikedBookIds.value.push(bookId)
+    dislikedBooks.value.push({ bookId, reason: selectedDislikeReason.value })
+  } catch (err) {
+    console.error('处理不感兴趣失败:', err)
+  }
+
+  dislikeModalVisible.value = false
+  selectedDislikeReason.value = ''
+  currentDislikeBookId.value = null
+}
+
+const cancelDislike = () => {
+  dislikeModalVisible.value = false
+  selectedDislikeReason.value = ''
+  currentDislikeBookId.value = null
+}
+
+const handleDislikeOptionClick = async (reason) => {
+  const savedUser = localStorage.getItem('user')
+  if (!savedUser) {
+    return
+  }
+
+  const user = JSON.parse(savedUser)
+  const bookId = currentDislikeBookId.value
+
+  try {
+    await axios.post('http://127.0.0.1:8000/api/user/action/', {
+      user_id: user.id,
+      book_id: bookId,
+      action_type: 'dislike',
+      reason: reason
+    })
+
+    dislikedBookIds.value.push(bookId)
+    dislikedBooks.value.push({ bookId, reason })
+  } catch (err) {
+    console.error('处理不感兴趣失败:', err)
+  }
+
+  dislikeModalVisible.value = false
+  currentDislikeBookId.value = null
+}
+
+const undoDislike = async (bookId) => {
+  const index = dislikedBookIds.value.indexOf(bookId)
+  if (index > -1) {
+    dislikedBookIds.value.splice(index, 1)
+  }
+
+  const dislikedIndex = dislikedBooks.value.findIndex(item => item.bookId === bookId)
+  if (dislikedIndex > -1) {
+    dislikedBooks.value.splice(dislikedIndex, 1)
+  }
+
+  const savedUser = localStorage.getItem('user')
+  if (savedUser) {
+    const user = JSON.parse(savedUser)
+    try {
+      const res = await axios.get('http://127.0.0.1:8000/api/user/actions/', {
+        params: {
+          user_id: user.id,
+          action_type: 'dislike'
+        }
+      })
+
+      if (res.data.code === 200) {
+        const dislikeAction = res.data.data.find(action => action.book_id === bookId)
+        if (dislikeAction && dislikeAction.id) {
+          await axios.delete(`http://127.0.0.1:8000/api/user/action/${dislikeAction.id}/`)
+        }
+      }
+    } catch (err) {
+      console.error('撤销不感兴趣失败:', err)
+    }
   }
 }
 
@@ -345,19 +491,41 @@ const loadInitialRecommendations = async () => {
     loading.value = true
     error.value = ''
     
-    // 首先检查本地存储中是否有补偿推荐的书籍
+    // 检查本地存储中是否有之前保存的兴趣标签
+    const savedTags = localStorage.getItem('selectedInterestTags')
+    const savedUser = localStorage.getItem('user')
+    const userId = savedUser ? JSON.parse(savedUser).id : null
+    
+    if (savedTags) {
+      try {
+        const tags = JSON.parse(savedTags)
+        if (tags.length >= 3 && tags.length <= 5) {
+          // 使用保存的标签重新获取推荐
+          const res = await axios.post('http://127.0.0.1:8000/api/interests/', {
+            tags: tags,
+            user_id: userId
+          })
+          
+          if (res.data.code === 200) {
+            recommendations.value = res.data.data
+            return
+          }
+        }
+      } catch (e) {
+        console.error('解析保存的标签失败:', e)
+      }
+    }
+    
+    // 如果没有保存的标签或获取失败，使用常规推荐
     const compensationRecs = localStorage.getItem('compensation_recommendations')
     
-    // 然后获取常规推荐
     const res = await axios.get('http://127.0.0.1:8000/api/recommend/you_may_like/')
     
     if (res.data.code === 200) {
       if (compensationRecs) {
         try {
           const parsedRecs = JSON.parse(compensationRecs)
-          // 将补偿推荐的书籍添加到推荐列表的最前端
           recommendations.value = [...parsedRecs, ...res.data.data]
-          // 清除本地存储中的补偿推荐，避免重复显示
           localStorage.removeItem('compensation_recommendations')
         } catch (e) {
           console.error('解析补偿推荐失败:', e)
@@ -939,7 +1107,7 @@ onMounted(() => {
 /* 书籍网格 */
 .books-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 32px;
   margin-top: 0;
   max-width: 100%;
@@ -965,24 +1133,195 @@ onMounted(() => {
   z-index: 10;
 }
 
-.book-card:hover .book-intro {
-  display: none;
-}
-
-.book-card:hover .book-author {
-  display: none;
-}
-
-.book-card:hover .book-meta {
-  display: none;
-}
-
-.book-card:hover .book-actions {
-  display: none;
-}
-
-.book-card:hover .book-full-intro {
+.dislike-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.95);
   display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  border-radius: 12px;
+}
+
+.dark-mode .dislike-overlay {
+  background: rgba(0, 0, 0, 0.90);
+}
+
+.dark-mode .dislike-text {
+  color: #fff;
+}
+
+.dislike-content {
+  text-align: center;
+  padding: 20px;
+}
+
+.dislike-text {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: #666;
+}
+
+.undo-btn {
+  padding: 8px 24px;
+  background: black;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.3s ease;
+}
+
+.undo-btn:hover {
+  background: #333;
+}
+
+/* 不感兴趣弹窗 */
+.dislike-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.dislike-modal {
+  background: white;
+  border-radius: 12px;
+  width: 80%;
+  max-width: 280px;
+  aspect-ratio: 1;
+  overflow: hidden;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+}
+
+.dislike-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #eee;
+  flex-shrink: 0;
+}
+
+.dislike-modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: #999;
+  cursor: pointer;
+  padding: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.close-btn:hover {
+  background: #f5f5f5;
+  color: #666;
+}
+
+.dislike-modal-body {
+  flex: 1;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.dislike-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: #f8f9fa;
+}
+
+.dislike-option:hover {
+  background: #e9ecef;
+  transform: scale(1.02);
+}
+
+.dislike-option:active {
+  transform: scale(0.98);
+}
+
+.option-icon {
+  font-size: 32px;
+  margin-bottom: 6px;
+}
+
+.option-label {
+  font-size: 13px;
+  color: #555;
+  text-align: center;
+}
+
+/* 深色模式 */
+.home-page.dark-mode .dislike-modal-overlay {
+  background: rgba(0, 0, 0, 0.8) !important;
+}
+
+.dark-mode .dislike-modal {
+  background: #1a1a1a;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+}
+
+.dark-mode .dislike-modal-header {
+  border-bottom-color: #333;
+}
+
+.dark-mode .dislike-modal-header h3 {
+  color: #fff;
+}
+
+.dark-mode .close-btn {
+  color: #666;
+}
+
+.dark-mode .close-btn:hover {
+  background: #333;
+  color: #fff;
+}
+
+.dark-mode .dislike-option {
+  background: #2a2a2a;
+}
+
+.dark-mode .dislike-option:hover {
+  background: #333;
+}
+
+.dark-mode .option-label {
+  color: #ccc;
 }
 
 /* 书籍排名 */
