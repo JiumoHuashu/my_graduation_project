@@ -1,7 +1,5 @@
 from django.db import models
-from django.contrib.auth.models import AbstractUser
-from django.contrib.auth.hashers import check_password
-from django.conf import settings
+from django.contrib.auth.hashers import make_password, check_password
 import os
 
 class FalooBook(models.Model):
@@ -39,14 +37,25 @@ class Admin(models.Model):
     def check_password(self, password):
         return check_password(password, self.password)
 
-class User(AbstractUser):
+class User(models.Model):
+    id = models.AutoField(primary_key=True, verbose_name="用户ID")
+    username = models.CharField(max_length=150, unique=True, verbose_name="用户名")
     email = models.EmailField(unique=True, verbose_name="邮箱")
+    password = models.CharField(max_length=128, verbose_name="密码")
     avatar = models.CharField(max_length=255, default="https://img2.baidu.com/it/u=1871712030,2993625157&fm=253&fmt=auto&app=138&f=JPEG?w=500&h=500", verbose_name="头像")
+    is_active = models.BooleanField(default=True, verbose_name="是否活跃")
+    date_joined = models.DateTimeField(auto_now_add=True, verbose_name="加入时间")
 
     class Meta:
         db_table = 'faloo_user'
         verbose_name = '用户'
         verbose_name_plural = '用户'
+
+    def set_password(self, raw_password):
+        self.password = make_password(raw_password)
+
+    def check_password(self, raw_password):
+        return check_password(raw_password, self.password)
 
 class UserBookshelf(models.Model):
     id = models.AutoField(primary_key=True, verbose_name="书架ID")
